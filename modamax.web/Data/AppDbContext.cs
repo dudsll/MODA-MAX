@@ -1,5 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
-using ModaMax.Web.Models;
+using Microsoft.EntityFrameworkCore;
+using modamax.web.Models;
 
 namespace ModaMax.Web.Data
 {
@@ -9,7 +9,9 @@ namespace ModaMax.Web.Data
             : base(options)
         {
         }
-
+        public DbSet<modamax.web.Models.Produto> Produto { get; set; } = default!;
+        //aqui mapeia as tabelas do banco
         public DbSet<Produto> Produtos { get; set; }
+        //public DbSet<Cliente> Clientes { get; set; }
     }
 }
