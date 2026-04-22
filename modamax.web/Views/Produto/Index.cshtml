@@ -1,47 +1,50 @@
 @model IEnumerable<modamax.web.Models.Produto>
 
 @{
-    ViewData["Title"] = "Index";
+    ViewData["Title"] = "Produtos";
 }
 
-<h1>Index</h1>
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Cadastros</p>
+        <h1>Produtos</h1>
+        <p class="page-copy">Controle o catalogo da loja com informacoes de estoque, categoria e fornecedor.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">Novo produto</a>
+</div>
 
-<p>
-    <a asp-action="Create">Create New</a>
-</p>
-<table class="table">
-    <thead>
-        <tr>
-            <th>
-                @Html.DisplayNameFor(model => model.Nome)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.Preco)
-            </th>
-            <th>
-                @Html.DisplayNameFor(model => model.Estoque)
-            </th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-@foreach (var item in Model) {
-        <tr>
-            <td>
-                @Html.DisplayFor(modelItem => item.Nome)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.Preco)
-            </td>
-            <td>
-                @Html.DisplayFor(modelItem => item.Estoque)
-            </td>
-            <td>
-                <a asp-action="Edit" asp-route-id="@item.Id">Edit</a> |
-                <a asp-action="Details" asp-route-id="@item.Id">Details</a> |
-                <a asp-action="Delete" asp-route-id="@item.Id">Delete</a>
-            </td>
-        </tr>
-}
-    </tbody>
-</table>
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="table table-modern align-middle">
+            <thead>
+                <tr>
+                    <th>@Html.DisplayNameFor(model => model.IdProduto)</th>
+                    <th>@Html.DisplayNameFor(model => model.Nome)</th>
+                    <th>@Html.DisplayNameFor(model => model.Categoria)</th>
+                    <th>@Html.DisplayNameFor(model => model.Fornecedor)</th>
+                    <th>@Html.DisplayNameFor(model => model.Preco)</th>
+                    <th>@Html.DisplayNameFor(model => model.Estoque)</th>
+                    <th class="text-end">Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.IdProduto</td>
+                    <td>@item.Nome</td>
+                    <td>@item.Categoria?.Nome</td>
+                    <td>@item.Fornecedor?.Nome</td>
+                    <td>@item.Preco.ToString("C")</td>
+                    <td>@item.Estoque</td>
+                    <td class="text-end">
+                        <a asp-action="Edit" asp-route-id="@item.IdProduto">Editar</a> |
+                        <a asp-action="Details" asp-route-id="@item.IdProduto">Detalhes</a> |
+                        <a asp-action="Delete" asp-route-id="@item.IdProduto">Excluir</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

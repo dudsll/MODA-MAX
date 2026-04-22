@@ -1,0 +1,61 @@
+@model modamax.web.Models.Cliente
+
+@{
+    ViewData["Title"] = "Editar cliente";
+}
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Cadastros</p>
+        <h1>Editar cliente</h1>
+    </div>
+    <a class="btn btn-outline-secondary" asp-action="Index">Voltar</a>
+</div>
+
+<div class="content-card form-card">
+    <form asp-action="Edit" class="row g-3">
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+        <input type="hidden" asp-for="IdCliente" />
+
+        <div class="col-md-6">
+            <label asp-for="Nome" class="form-label"></label>
+            <input asp-for="Nome" class="form-control" />
+            <span asp-validation-for="Nome" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="Tipo" class="form-label"></label>
+            <select asp-for="Tipo" class="form-select">
+                <option value="PF">PF</option>
+                <option value="PJ">PJ</option>
+            </select>
+            <span asp-validation-for="Tipo" class="text-danger"></span>
+        </div>
+        <div class="col-md-3">
+            <label asp-for="Telefone" class="form-label"></label>
+            <input asp-for="Telefone" class="form-control" />
+            <span asp-validation-for="Telefone" class="text-danger"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="Documento" class="form-label"></label>
+            <input asp-for="Documento" class="form-control" />
+            <span asp-validation-for="Documento" class="text-danger"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="Email" class="form-label"></label>
+            <input asp-for="Email" class="form-control" />
+            <span asp-validation-for="Email" class="text-danger"></span>
+        </div>
+        <div class="col-md-4">
+            <label asp-for="Endereco" class="form-label"></label>
+            <input asp-for="Endereco" class="form-control" />
+            <span asp-validation-for="Endereco" class="text-danger"></span>
+        </div>
+        <div class="col-12">
+            <button type="submit" class="btn btn-primary">Salvar alteracoes</button>
+        </div>
+    </form>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

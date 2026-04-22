@@ -1,0 +1,77 @@
+@model modamax.web.Models.Cliente
+
+@{
+    ViewData["Title"] = "Detalhes do cliente";
+}
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Cadastros</p>
+        <h1>@Model.Nome</h1>
+    </div>
+    <div class="header-actions">
+        <a class="btn btn-outline-secondary" asp-action="Index">Voltar</a>
+        <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.IdCliente">Editar</a>
+    </div>
+</div>
+
+<div class="content-grid">
+    <article class="content-card details-card">
+        <h2>Dados cadastrais</h2>
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Codigo</dt>
+            <dd class="col-sm-8">@Model.IdCliente</dd>
+
+            <dt class="col-sm-4">Tipo</dt>
+            <dd class="col-sm-8">@Model.Tipo</dd>
+
+            <dt class="col-sm-4">Documento</dt>
+            <dd class="col-sm-8">@Model.Documento</dd>
+
+            <dt class="col-sm-4">Email</dt>
+            <dd class="col-sm-8">@Model.Email</dd>
+
+            <dt class="col-sm-4">Telefone</dt>
+            <dd class="col-sm-8">@Model.Telefone</dd>
+
+            <dt class="col-sm-4">Endereco</dt>
+            <dd class="col-sm-8">@Model.Endereco</dd>
+        </dl>
+    </article>
+
+    <article class="content-card">
+        <h2>Pedidos do cliente</h2>
+        <div class="table-responsive">
+            <table class="table table-modern">
+                <thead>
+                    <tr>
+                        <th>Pedido</th>
+                        <th>Data</th>
+                        <th>Status</th>
+                        <th>Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @if (Model.Pedidos.Any())
+                {
+                    foreach (var pedido in Model.Pedidos)
+                    {
+                        <tr>
+                            <td>#@pedido.IdPedido</td>
+                            <td>@pedido.DataPedido.ToString("dd/MM/yyyy")</td>
+                            <td>@pedido.Status</td>
+                            <td>@pedido.ValorTotal.ToString("C")</td>
+                        </tr>
+                    }
+                }
+                else
+                {
+                    <tr>
+                        <td colspan="4">Nenhum pedido encontrado para este cliente.</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </article>
+</div>

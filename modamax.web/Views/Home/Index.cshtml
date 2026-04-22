@@ -1,9 +1,102 @@
-﻿@{
-    ViewData["Title"] = "Home Page";
+@model modamax.web.ViewModels.DashboardViewModel
+
+@{
+    ViewData["Title"] = "Dashboard";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<section class="hero-panel">
+    <div>
+        <p class="eyebrow">ModaMax</p>
+        <h1>Painel de controle da loja</h1>
+        <p class="hero-copy">
+            Acompanhe os principais numeros do sistema, os pedidos mais recentes e os produtos que pedem reposicao.
+        </p>
+    </div>
+    <div class="hero-badge">Gestao comercial e estoque</div>
+</section>
 
+<section class="metrics-grid">
+    <article class="metric-card">
+        <span class="metric-label">Produtos cadastrados</span>
+        <strong>@Model.TotalProdutos</strong>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label">Clientes ativos</span>
+        <strong>@Model.TotalClientes</strong>
+    </article>
+    <article class="metric-card">
+        <span class="metric-label">Pedidos</span>
+        <strong>@Model.TotalPedidos</strong>
+    </article>
+    <article class="metric-card accent-card">
+        <span class="metric-label">Faturamento</span>
+        <strong>@Model.FaturamentoTotal.ToString("C")</strong>
+    </article>
+</section>
+
+<section class="content-grid">
+    <article class="content-card">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Estoque</p>
+                <h2>Produtos com menor estoque</h2>
+            </div>
+            <a class="btn btn-outline-primary" asp-controller="Produto" asp-action="Index">Ver produtos</a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-modern">
+                <thead>
+                    <tr>
+                        <th>Produto</th>
+                        <th>Categoria</th>
+                        <th>Estoque</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var produto in Model.ProdutosComMenorEstoque)
+                {
+                    <tr>
+                        <td>@produto.Nome</td>
+                        <td>@produto.Categoria?.Nome</td>
+                        <td>@produto.Estoque</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="content-card">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Vendas</p>
+                <h2>Pedidos recentes</h2>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-modern">
+                <thead>
+                    <tr>
+                        <th>Pedido</th>
+                        <th>Cliente</th>
+                        <th>Status</th>
+                        <th>Valor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var pedido in Model.PedidosRecentes)
+                {
+                    <tr>
+                        <td>#@pedido.IdPedido</td>
+                        <td>@pedido.Cliente?.Nome</td>
+                        <td>@pedido.Status</td>
+                        <td>@pedido.ValorTotal.ToString("C")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </article>
+</section>

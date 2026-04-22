@@ -1,163 +1,164 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
 using modamax.web.Models;
 
-namespace modamax.web.Controllers
+namespace modamax.web.Controllers;
+
+public class ProdutoController : Controller
 {
-    public class ProdutoController : Controller
+    private readonly AppDbContext _context;
+
+    public ProdutoController(AppDbContext context)
     {
-        private readonly AppDbContext _context;
+        _context = context;
+    }
 
-        public ProdutoController(AppDbContext context)
+    public async Task<IActionResult> Index()
+    {
+        var produtos = await _context.Produtos
+            .Include(p => p.Categoria)
+            .Include(p => p.Fornecedor)
+            .OrderBy(p => p.Nome)
+            .ToListAsync();
+
+        return View(produtos);
+    }
+
+    public async Task<IActionResult> Details(int? id)
+    {
+        if (id == null)
         {
-            _context = context;
+            return NotFound();
         }
 
-        // GET: Produto
-        public async Task<IActionResult> Index()
+        var produto = await _context.Produtos
+            .Include(p => p.Categoria)
+            .Include(p => p.Fornecedor)
+            .FirstOrDefaultAsync(m => m.IdProduto == id);
+
+        if (produto == null)
         {
-              return _context.Produto != null ? 
-                          View(await _context.Produto.ToListAsync()) :
-                          Problem("Entity set 'AppDbContext.Produto'  is null.");
+            return NotFound();
         }
 
-        // GET: Produto/Details/5
-        public async Task<IActionResult> Details(int? id)
+        return View(produto);
+    }
+
+    public IActionResult Create()
+    {
+        CarregarCombos();
+        return View(new Produto());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Create([Bind("IdProduto,Nome,Descricao,Tamanho,Cor,Preco,Estoque,IdCategoria,IdFornecedor")] Produto produto)
+    {
+        if (!ModelState.IsValid)
         {
-            if (id == null || _context.Produto == null)
-            {
-                return NotFound();
-            }
-
-            var produto = await _context.Produto
-                .FirstOrDefaultAsync(m => m.Id == id);
-            if (produto == null)
-            {
-                return NotFound();
-            }
-
+            CarregarCombos(produto.IdCategoria, produto.IdFornecedor);
             return View(produto);
         }
 
-        // GET: Produto/Create
-        public IActionResult Create()
+        _context.Add(produto);
+        await _context.SaveChangesAsync();
+        return RedirectToAction(nameof(Index));
+    }
+
+    public async Task<IActionResult> Edit(int? id)
+    {
+        if (id == null)
         {
-            return View();
+            return NotFound();
         }
 
-        // POST: Produto/Create
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Nome,Preco,Estoque")] Produto produto)
+        var produto = await _context.Produtos.FindAsync(id);
+        if (produto == null)
         {
-            if (ModelState.IsValid)
-            {
-                _context.Add(produto);
-                await _context.SaveChangesAsync();
-                return RedirectToAction(nameof(Index));
-            }
+            return NotFound();
+        }
+
+        CarregarCombos(produto.IdCategoria, produto.IdFornecedor);
+        return View(produto);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Edit(int id, [Bind("IdProduto,Nome,Descricao,Tamanho,Cor,Preco,Estoque,IdCategoria,IdFornecedor")] Produto produto)
+    {
+        if (id != produto.IdProduto)
+        {
+            return NotFound();
+        }
+
+        if (!ModelState.IsValid)
+        {
+            CarregarCombos(produto.IdCategoria, produto.IdFornecedor);
             return View(produto);
         }
 
-        // GET: Produto/Edit/5
-        public async Task<IActionResult> Edit(int? id)
+        try
         {
-            if (id == null || _context.Produto == null)
-            {
-                return NotFound();
-            }
-
-            var produto = await _context.Produto.FindAsync(id);
-            if (produto == null)
-            {
-                return NotFound();
-            }
-            return View(produto);
-        }
-
-        // POST: Produto/Edit/5
-        // To protect from overposting attacks, enable the specific properties you want to bind to.
-        // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(int id, [Bind("Id,Nome,Preco,Estoque")] Produto produto)
-        {
-            if (id != produto.Id)
-            {
-                return NotFound();
-            }
-
-            if (ModelState.IsValid)
-            {
-                try
-                {
-                    _context.Update(produto);
-                    await _context.SaveChangesAsync();
-                }
-                catch (DbUpdateConcurrencyException)
-                {
-                    if (!ProdutoExists(produto.Id))
-                    {
-                        return NotFound();
-                    }
-                    else
-                    {
-                        throw;
-                    }
-                }
-                return RedirectToAction(nameof(Index));
-            }
-            return View(produto);
-        }
-
-        // GET: Produto/Delete/5
-        public async Task<IActionResult> Delete(int? id)
-        {
-            if (id == null || _context.Produto == null)
-            {
-                return NotFound();
-            }
-
-            var produto = await _context.Produto
-                .FirstOrDefaultAsync(m => m.Id == id);
-            if (produto == null)
-            {
-                return NotFound();
-            }
-
-            return View(produto);
-        }
-
-        // POST: Produto/Delete/5
-        [HttpPost, ActionName("Delete")]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteConfirmed(int id)
-        {
-            if (_context.Produto == null)
-            {
-                return Problem("Entity set 'AppDbContext.Produto'  is null.");
-            }
-            var produto = await _context.Produto.FindAsync(id);
-            if (produto != null)
-            {
-                _context.Produto.Remove(produto);
-            }
-            
+            _context.Update(produto);
             await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            if (!ProdutoExists(produto.IdProduto))
+            {
+                return NotFound();
+            }
+
+            throw;
         }
 
-        private bool ProdutoExists(int id)
+        return RedirectToAction(nameof(Index));
+    }
+
+    public async Task<IActionResult> Delete(int? id)
+    {
+        if (id == null)
         {
-          return (_context.Produto?.Any(e => e.Id == id)).GetValueOrDefault();
+            return NotFound();
         }
+
+        var produto = await _context.Produtos
+            .Include(p => p.Categoria)
+            .Include(p => p.Fornecedor)
+            .FirstOrDefaultAsync(m => m.IdProduto == id);
+
+        if (produto == null)
+        {
+            return NotFound();
+        }
+
+        return View(produto);
+    }
+
+    [HttpPost, ActionName("Delete")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteConfirmed(int id)
+    {
+        var produto = await _context.Produtos.FindAsync(id);
+        if (produto != null)
+        {
+            _context.Produtos.Remove(produto);
+            await _context.SaveChangesAsync();
+        }
+
+        return RedirectToAction(nameof(Index));
+    }
+
+    private bool ProdutoExists(int id)
+    {
+        return _context.Produtos.Any(e => e.IdProduto == id);
+    }
+
+    private void CarregarCombos(int? categoriaSelecionada = null, int? fornecedorSelecionado = null)
+    {
+        ViewBag.Categorias = new SelectList(_context.Categorias.OrderBy(c => c.Nome), "IdCategoria", "Nome", categoriaSelecionada);
+        ViewBag.Fornecedores = new SelectList(_context.Fornecedores.OrderBy(f => f.Nome), "IdFornecedor", "Nome", fornecedorSelecionado);
     }
 }

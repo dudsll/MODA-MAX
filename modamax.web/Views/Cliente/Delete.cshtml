@@ -1,0 +1,31 @@
+@model modamax.web.Models.Cliente
+
+@{
+    ViewData["Title"] = "Excluir cliente";
+}
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Cadastros</p>
+        <h1>Excluir cliente</h1>
+        <p class="page-copy">Confirme se deseja remover este cadastro.</p>
+    </div>
+    <a class="btn btn-outline-secondary" asp-action="Index">Voltar</a>
+</div>
+
+<div class="content-card details-card">
+    <dl class="row">
+        <dt class="col-sm-3">Nome</dt>
+        <dd class="col-sm-9">@Model.Nome</dd>
+
+        <dt class="col-sm-3">Documento</dt>
+        <dd class="col-sm-9">@Model.Documento</dd>
+
+        <dt class="col-sm-3">Email</dt>
+        <dd class="col-sm-9">@Model.Email</dd>
+    </dl>
+
+    <form asp-action="Delete" asp-route-id="@Model.IdCliente">
+        <button type="submit" class="btn btn-danger">Excluir</button>
+    </form>
+</div>

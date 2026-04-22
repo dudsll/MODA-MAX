@@ -1,0 +1,48 @@
+@model IEnumerable<modamax.web.Models.Cliente>
+
+@{
+    ViewData["Title"] = "Clientes";
+}
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Cadastros</p>
+        <h1>Clientes</h1>
+        <p class="page-copy">Gerencie os dados de clientes e acompanhe o relacionamento com a loja.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">Novo cliente</a>
+</div>
+
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="table table-modern align-middle">
+            <thead>
+                <tr>
+                    <th>Codigo</th>
+                    <th>Nome</th>
+                    <th>Documento</th>
+                    <th>Email</th>
+                    <th>Telefone</th>
+                    <th class="text-end">Acoes</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td>@item.IdCliente</td>
+                    <td>@item.Nome</td>
+                    <td>@item.Documento</td>
+                    <td>@item.Email</td>
+                    <td>@item.Telefone</td>
+                    <td class="text-end">
+                        <a asp-action="Edit" asp-route-id="@item.IdCliente">Editar</a> |
+                        <a asp-action="Details" asp-route-id="@item.IdCliente">Detalhes</a> |
+                        <a asp-action="Delete" asp-route-id="@item.IdCliente">Excluir</a>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
