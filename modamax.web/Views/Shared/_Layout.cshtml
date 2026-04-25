@@ -1,3 +1,10 @@
+@using Microsoft.AspNetCore.Http
+@{
+    var usuarioNome = Context.Session.GetString("UsuarioNome");
+    var usuarioNivel = Context.Session.GetString("UsuarioNivel");
+    var logado = !string.IsNullOrWhiteSpace(usuarioNome);
+}
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -21,10 +28,35 @@
                 </a>
 
                 <nav class="main-nav">
-                    <a asp-controller="Home" asp-action="Index">Dashboard</a>
-                    <a asp-controller="Produto" asp-action="Index">Produtos</a>
-                    <a asp-controller="Cliente" asp-action="Index">Clientes</a>
+                    @if (logado)
+                    {
+                        <a asp-controller="Home" asp-action="Index">Dashboard</a>
+                        <a asp-controller="Produto" asp-action="Index">Produtos</a>
+                        <a asp-controller="Categoria" asp-action="Index">Categorias</a>
+                        <a asp-controller="Cliente" asp-action="Index">Clientes</a>
+                        <a asp-controller="Pedido" asp-action="Index">Pedidos</a>
+                        <a asp-controller="Pedido" asp-action="Historico">Historico</a>
+                        <a asp-controller="Relatorio" asp-action="Index">Relatorios</a>
+
+                        @if (usuarioNivel == "Estrategico")
+                        {
+                            <a asp-controller="Usuario" asp-action="Index">Usuarios</a>
+                            <a asp-controller="Log" asp-action="Index">Logs</a>
+                        }
+                    }
                 </nav>
+
+                <div class="user-pill">
+                    @if (logado)
+                    {
+                        <span>@usuarioNome (@usuarioNivel)</span>
+                        <a class="btn btn-sm btn-outline-secondary" asp-controller="Account" asp-action="Logout">Sair</a>
+                    }
+                    else
+                    {
+                        <a class="btn btn-sm btn-primary" asp-controller="Account" asp-action="Login">Entrar</a>
+                    }
+                </div>
             </div>
         </header>
 

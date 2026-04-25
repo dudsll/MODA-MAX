@@ -14,6 +14,33 @@
 </div>
 
 <div class="content-card">
+    <form method="get" class="row g-3 mb-4">
+        <div class="col-md-4">
+            <label class="form-label">Busca</label>
+            <input type="text" name="busca" value="@ViewBag.Busca" class="form-control" placeholder="Nome ou codigo" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Categoria</label>
+            <select name="categoriaId" asp-items="ViewBag.CategoriasFiltro" class="form-select">
+                <option value="">Todas</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Tamanho</label>
+            <input type="text" name="tamanho" value="@ViewBag.Tamanho" class="form-control" />
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Disponibilidade</label>
+            <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" name="somenteDisponiveis" value="true" @(ViewBag.SomenteDisponiveis ? "checked" : "") />
+                <label class="form-check-label">Apenas em estoque</label>
+            </div>
+        </div>
+        <div class="col-md-1 d-flex align-items-end">
+            <button type="submit" class="btn btn-outline-primary w-100">Filtrar</button>
+        </div>
+    </form>
+
     <div class="table-responsive">
         <table class="table table-modern align-middle">
             <thead>

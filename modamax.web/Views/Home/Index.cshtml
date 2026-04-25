@@ -28,9 +28,32 @@
         <span class="metric-label">Pedidos</span>
         <strong>@Model.TotalPedidos</strong>
     </article>
+    <article class="metric-card">
+        <span class="metric-label">Usuarios</span>
+        <strong>@Model.TotalUsuarios</strong>
+    </article>
     <article class="metric-card accent-card">
         <span class="metric-label">Faturamento</span>
         <strong>@Model.FaturamentoTotal.ToString("C")</strong>
+    </article>
+</section>
+
+<section class="metrics-grid metrics-grid-secondary">
+    <article class="metric-card">
+        <span class="metric-label">Estoque em alerta</span>
+        <strong>@Model.ProdutosAbaixoDoMinimo</strong>
+    </article>
+    <article class="metric-card quick-link-card">
+        <span class="metric-label">Novo pedido</span>
+        <a asp-controller="Pedido" asp-action="Create">Registrar venda</a>
+    </article>
+    <article class="metric-card quick-link-card">
+        <span class="metric-label">Historico</span>
+        <a asp-controller="Pedido" asp-action="Historico">Ver pedidos</a>
+    </article>
+    <article class="metric-card quick-link-card">
+        <span class="metric-label">Relatorios</span>
+        <a asp-controller="Relatorio" asp-action="Index">Abrir relatorios</a>
     </article>
 </section>
 
@@ -93,6 +116,37 @@
                         <td>@pedido.Cliente?.Nome</td>
                         <td>@pedido.Status</td>
                         <td>@pedido.ValorTotal.ToString("C")</td>
+                    </tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </article>
+
+    <article class="content-card">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Auditoria</p>
+                <h2>Logs recentes</h2>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-modern">
+                <thead>
+                    <tr>
+                        <th>Data</th>
+                        <th>Usuario</th>
+                        <th>Acao</th>
+                    </tr>
+                </thead>
+                <tbody>
+                @foreach (var log in Model.LogsRecentes)
+                {
+                    <tr>
+                        <td>@log.Data.ToString("dd/MM/yyyy HH:mm")</td>
+                        <td>@(log.Usuario?.Nome ?? "Sistema")</td>
+                        <td>@log.Acao</td>
                     </tr>
                 }
                 </tbody>

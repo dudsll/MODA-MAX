@@ -1,0 +1,13 @@
+@model IEnumerable<modamax.web.Models.Categoria>
+@{
+    ViewData["Title"] = "Categorias";
+}
+<div class="page-header">
+    <div><p class="section-kicker">Cadastros</p><h1>Categorias</h1></div>
+    <a class="btn btn-primary" asp-action="Create">Nova categoria</a>
+</div>
+<div class="content-card"><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Codigo</th><th>Nome</th><th class="text-end">Acoes</th></tr></thead><tbody>
+@foreach (var item in Model) {
+<tr><td>@item.IdCategoria</td><td>@item.Nome</td><td class="text-end"><a asp-action="Edit" asp-route-id="@item.IdCategoria">Editar</a> | <a asp-action="Details" asp-route-id="@item.IdCategoria">Detalhes</a> | <a asp-action="Delete" asp-route-id="@item.IdCategoria">Excluir</a></td></tr>
+}
+</tbody></table></div></div>

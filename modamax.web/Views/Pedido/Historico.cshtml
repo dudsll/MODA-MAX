@@ -1,0 +1,28 @@
+@model IEnumerable<modamax.web.Models.Pedido>
+@{
+    ViewData["Title"] = "Historico de pedidos";
+    var clientes = ViewBag.Clientes as List<modamax.web.Models.Cliente> ?? new();
+}
+<div class="page-header"><div><p class="section-kicker">Historico</p><h1>Historico de pedidos</h1></div></div>
+<div class="content-card">
+    <form method="get" class="row g-3 mb-4">
+        <div class="col-md-4">
+            <label class="form-label">Cliente</label>
+            <select class="form-select" name="clienteId">
+                <option value="">Todos</option>
+                @foreach (var cliente in clientes)
+                {
+                    <option value="@cliente.IdCliente" selected="@(ViewBag.ClienteId == cliente.IdCliente)">@cliente.Nome</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Filtrar</button></div>
+    </form>
+    <div class="table-responsive"><table class="table table-modern"><thead><tr><th>Pedido</th><th>Cliente</th><th>Produto</th><th>Data</th><th>Status</th><th>Valor</th></tr></thead><tbody>
+    @foreach (var pedido in Model)
+    {
+        var item = pedido.Itens.FirstOrDefault();
+        <tr><td>#@pedido.IdPedido</td><td>@pedido.Cliente?.Nome</td><td>@item?.Produto?.Nome</td><td>@pedido.DataPedido.ToString("dd/MM/yyyy")</td><td>@pedido.Status</td><td>@pedido.ValorTotal.ToString("C")</td></tr>
+    }
+    </tbody></table></div>
+</div>

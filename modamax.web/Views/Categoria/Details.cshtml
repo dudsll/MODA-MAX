@@ -1,0 +1,4 @@
+@model modamax.web.Models.Categoria
+@{ ViewData["Title"] = "Detalhes da categoria"; }
+<div class="page-header"><div><p class="section-kicker">Cadastros</p><h1>@Model.Nome</h1></div><a class="btn btn-outline-secondary" asp-action="Index">Voltar</a></div>
+<div class="content-card details-card"><dl class="row mb-0"><dt class="col-sm-3">Codigo</dt><dd class="col-sm-9">@Model.IdCategoria</dd><dt class="col-sm-3">Nome</dt><dd class="col-sm-9">@Model.Nome</dd></dl></div>

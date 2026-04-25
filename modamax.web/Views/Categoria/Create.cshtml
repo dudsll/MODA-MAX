@@ -1,0 +1,5 @@
+@model modamax.web.Models.Categoria
+@{ ViewData["Title"] = "Nova categoria"; }
+<div class="page-header"><div><p class="section-kicker">Cadastros</p><h1>Nova categoria</h1></div><a class="btn btn-outline-secondary" asp-action="Index">Voltar</a></div>
+<div class="content-card form-card"><form asp-action="Create" class="row g-3"><div asp-validation-summary="ModelOnly" class="text-danger"></div><div class="col-md-6"><label asp-for="Nome" class="form-label"></label><input asp-for="Nome" class="form-control" /><span asp-validation-for="Nome" class="text-danger"></span></div><div class="col-12"><button class="btn btn-primary" type="submit">Salvar</button></div></form></div>
+@section Scripts { @{await Html.RenderPartialAsync("_ValidationScriptsPartial");} }

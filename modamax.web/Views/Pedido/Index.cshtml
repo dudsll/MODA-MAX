@@ -1,0 +1,8 @@
+@model IEnumerable<modamax.web.Models.Pedido>
+@{ ViewData["Title"] = "Pedidos"; }
+<div class="page-header"><div><p class="section-kicker">Vendas</p><h1>Pedidos</h1><p class="page-copy">Cadastre pedidos com impacto direto no estoque.</p></div><a class="btn btn-primary" asp-action="Create">Novo pedido</a></div>
+<div class="content-card"><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Pedido</th><th>Cliente</th><th>Data</th><th>Status</th><th>Tipo</th><th>Valor</th><th class="text-end">Acoes</th></tr></thead><tbody>
+@foreach (var item in Model) {
+<tr><td>#@item.IdPedido</td><td>@item.Cliente?.Nome</td><td>@item.DataPedido.ToString("dd/MM/yyyy")</td><td>@item.Status</td><td>@item.TiposVenda</td><td>@item.ValorTotal.ToString("C")</td><td class="text-end"><a asp-action="Edit" asp-route-id="@item.IdPedido">Editar</a> | <a asp-action="Details" asp-route-id="@item.IdPedido">Detalhes</a> | <a asp-action="Delete" asp-route-id="@item.IdPedido">Excluir</a></td></tr>
+}
+</tbody></table></div></div>

@@ -20,6 +20,14 @@ public class AppDbContext : DbContext
 
     public DbSet<Pedido> Pedidos => Set<Pedido>();
 
+    public DbSet<Usuario> Usuarios => Set<Usuario>();
+
+    public DbSet<ItemPedido> ItensPedido => Set<ItemPedido>();
+
+    public DbSet<MovimentacaoEstoque> MovimentacoesEstoque => Set<MovimentacaoEstoque>();
+
+    public DbSet<LogSistema> LogsSistema => Set<LogSistema>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -41,5 +49,29 @@ public class AppDbContext : DbContext
             .WithMany(c => c.Pedidos)
             .HasForeignKey(p => p.IdCliente)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ItemPedido>()
+            .HasOne(i => i.Pedido)
+            .WithMany(p => p.Itens)
+            .HasForeignKey(i => i.IdPedido)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ItemPedido>()
+            .HasOne(i => i.Produto)
+            .WithMany()
+            .HasForeignKey(i => i.IdProduto)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<MovimentacaoEstoque>()
+            .HasOne(m => m.Produto)
+            .WithMany()
+            .HasForeignKey(m => m.IdProduto)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<LogSistema>()
+            .HasOne(l => l.Usuario)
+            .WithMany(u => u.Logs)
+            .HasForeignKey(l => l.IdUsuario)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

@@ -1,0 +1,4 @@
+@model modamax.web.Models.Usuario
+@{ ViewData["Title"] = "Detalhes do usuario"; }
+<div class="page-header"><div><p class="section-kicker">Seguranca</p><h1>@Model.Nome</h1></div><a class="btn btn-outline-secondary" asp-action="Index">Voltar</a></div>
+<div class="content-card details-card"><dl class="row mb-0"><dt class="col-sm-3">Email</dt><dd class="col-sm-9">@Model.Email</dd><dt class="col-sm-3">Nivel</dt><dd class="col-sm-9">@Model.Nivel</dd></dl></div>

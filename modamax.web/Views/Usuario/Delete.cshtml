@@ -1,0 +1,4 @@
+@model modamax.web.Models.Usuario
+@{ ViewData["Title"] = "Excluir usuario"; }
+<div class="page-header"><div><p class="section-kicker">Seguranca</p><h1>Excluir usuario</h1></div><a class="btn btn-outline-secondary" asp-action="Index">Voltar</a></div>
+<div class="content-card details-card"><p>Confirme a exclusao do usuario <strong>@Model.Email</strong>.</p><form asp-action="Delete" asp-route-id="@Model.IdUsuario"><button class="btn btn-danger" type="submit">Excluir</button></form></div>

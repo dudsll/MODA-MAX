@@ -1,0 +1,8 @@
+@model IEnumerable<modamax.web.Models.Usuario>
+@{ ViewData["Title"] = "Usuarios"; }
+<div class="page-header"><div><p class="section-kicker">Seguranca</p><h1>Usuarios</h1></div><a class="btn btn-primary" asp-action="Create">Novo usuario</a></div>
+<div class="content-card"><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Nome</th><th>Email</th><th>Nivel</th><th class="text-end">Acoes</th></tr></thead><tbody>
+@foreach (var item in Model) {
+<tr><td>@item.Nome</td><td>@item.Email</td><td>@item.Nivel</td><td class="text-end"><a asp-action="Edit" asp-route-id="@item.IdUsuario">Editar</a> | <a asp-action="Details" asp-route-id="@item.IdUsuario">Detalhes</a> | <a asp-action="Delete" asp-route-id="@item.IdUsuario">Excluir</a></td></tr>
+}
+</tbody></table></div></div>

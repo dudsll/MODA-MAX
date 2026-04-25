@@ -9,7 +9,7 @@ public static class DbInitializer
     {
         context.Database.EnsureCreated();
 
-        if (context.Categorias.Any())
+        if (context.Usuarios.Any())
         {
             return;
         }
@@ -66,11 +66,47 @@ public static class DbInitializer
             new() { IdPedido = 5, IdCliente = 5, DataPedido = new DateTime(2026, 6, 3), TiposVenda = "Varejo", Status = "Finalizado", ValorTotal = 98.60m }
         };
 
+        var itensPedido = new List<ItemPedido>
+        {
+            new() { IdItem = 1, IdPedido = 1, IdProduto = 5, Quantidade = 1, PrecoUnitario = 160.73m, Desconto = 0m },
+            new() { IdItem = 2, IdPedido = 2, IdProduto = 6, Quantidade = 1, PrecoUnitario = 120.75m, Desconto = 0m },
+            new() { IdItem = 3, IdPedido = 3, IdProduto = 10, Quantidade = 1, PrecoUnitario = 170.97m, Desconto = 0m },
+            new() { IdItem = 4, IdPedido = 4, IdProduto = 9, Quantidade = 1, PrecoUnitario = 140.00m, Desconto = 0m },
+            new() { IdItem = 5, IdPedido = 5, IdProduto = 8, Quantidade = 1, PrecoUnitario = 98.60m, Desconto = 0m }
+        };
+
+        var usuarios = new List<Usuario>
+        {
+            new() { IdUsuario = 1, Nome = "Diretoria ModaMax", Email = "estrategico@modamax.com", Senha = "123456", Nivel = "Estrategico" },
+            new() { IdUsuario = 2, Nome = "Gestora Comercial", Email = "tatico@modamax.com", Senha = "123456", Nivel = "Tatico" },
+            new() { IdUsuario = 3, Nome = "Operador de Loja", Email = "operacional@modamax.com", Senha = "123456", Nivel = "Operacional" }
+        };
+
+        var movimentacoes = new List<MovimentacaoEstoque>
+        {
+            new() { IdMovi = 1, IdProduto = 5, Tipo = "Saida", Quantidade = 1, Data = new DateTime(2026, 6, 1), Observacao = "Pedido #1" },
+            new() { IdMovi = 2, IdProduto = 6, Tipo = "Saida", Quantidade = 1, Data = new DateTime(2026, 6, 1), Observacao = "Pedido #2" },
+            new() { IdMovi = 3, IdProduto = 10, Tipo = "Saida", Quantidade = 1, Data = new DateTime(2026, 6, 2), Observacao = "Pedido #3" },
+            new() { IdMovi = 4, IdProduto = 9, Tipo = "Saida", Quantidade = 1, Data = new DateTime(2026, 6, 3), Observacao = "Pedido #4" },
+            new() { IdMovi = 5, IdProduto = 8, Tipo = "Saida", Quantidade = 1, Data = new DateTime(2026, 6, 3), Observacao = "Pedido #5" }
+        };
+
+        var logs = new List<LogSistema>
+        {
+            new() { IdLog = 1, IdUsuario = 1, Acao = "Base inicial do sistema carregada.", Data = DateTime.Now.AddMinutes(-30) },
+            new() { IdLog = 2, IdUsuario = 2, Acao = "Produtos e clientes de exemplo cadastrados.", Data = DateTime.Now.AddMinutes(-20) },
+            new() { IdLog = 3, IdUsuario = 3, Acao = "Pedidos iniciais registrados para demonstracao.", Data = DateTime.Now.AddMinutes(-10) }
+        };
+
         context.Categorias.AddRange(categorias);
         context.Fornecedores.AddRange(fornecedores);
         context.Produtos.AddRange(produtos);
         context.Clientes.AddRange(clientes);
+        context.Usuarios.AddRange(usuarios);
         context.Pedidos.AddRange(pedidos);
+        context.ItensPedido.AddRange(itensPedido);
+        context.MovimentacoesEstoque.AddRange(movimentacoes);
+        context.LogsSistema.AddRange(logs);
         context.SaveChanges();
     }
 }

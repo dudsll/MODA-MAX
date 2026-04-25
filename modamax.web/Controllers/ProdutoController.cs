@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
+using modamax.web.Filters;
 using modamax.web.Models;
 
 namespace modamax.web.Controllers;
@@ -15,17 +16,48 @@ public class ProdutoController : Controller
         _context = context;
     }
 
-    public async Task<IActionResult> Index()
+    [RequireUser("Estrategico", "Tatico", "Operacional")]
+    public async Task<IActionResult> Index(string? busca, int? categoriaId, string? tamanho, bool somenteDisponiveis = false)
     {
-        var produtos = await _context.Produtos
+        var query = _context.Produtos
             .Include(p => p.Categoria)
             .Include(p => p.Fornecedor)
-            .OrderBy(p => p.Nome)
-            .ToListAsync();
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(busca))
+        {
+            query = query.Where(p =>
+                p.Nome.Contains(busca) ||
+                p.IdProduto.ToString().Contains(busca));
+        }
+
+        if (categoriaId.HasValue)
+        {
+            query = query.Where(p => p.IdCategoria == categoriaId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(tamanho))
+        {
+            query = query.Where(p => p.Tamanho == tamanho);
+        }
+
+        if (somenteDisponiveis)
+        {
+            query = query.Where(p => p.Estoque > 0);
+        }
+
+        ViewBag.Busca = busca;
+        ViewBag.CategoriaId = categoriaId;
+        ViewBag.Tamanho = tamanho;
+        ViewBag.SomenteDisponiveis = somenteDisponiveis;
+        ViewBag.CategoriasFiltro = new SelectList(await _context.Categorias.OrderBy(c => c.Nome).ToListAsync(), "IdCategoria", "Nome", categoriaId);
+
+        var produtos = await query.OrderBy(p => p.Nome).ToListAsync();
 
         return View(produtos);
     }
 
+    [RequireUser("Estrategico", "Tatico", "Operacional")]
     public async Task<IActionResult> Details(int? id)
     {
         if (id == null)
@@ -46,6 +78,7 @@ public class ProdutoController : Controller
         return View(produto);
     }
 
+    [RequireUser("Estrategico", "Tatico")]
     public IActionResult Create()
     {
         CarregarCombos();
@@ -54,6 +87,7 @@ public class ProdutoController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequireUser("Estrategico", "Tatico")]
     public async Task<IActionResult> Create([Bind("IdProduto,Nome,Descricao,Tamanho,Cor,Preco,Estoque,IdCategoria,IdFornecedor")] Produto produto)
     {
         if (!ModelState.IsValid)
@@ -64,9 +98,11 @@ public class ProdutoController : Controller
 
         _context.Add(produto);
         await _context.SaveChangesAsync();
+        await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Produto cadastrado: {produto.Nome}.");
         return RedirectToAction(nameof(Index));
     }
 
+    [RequireUser("Estrategico", "Tatico")]
     public async Task<IActionResult> Edit(int? id)
     {
         if (id == null)
@@ -86,6 +122,7 @@ public class ProdutoController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [RequireUser("Estrategico", "Tatico")]
     public async Task<IActionResult> Edit(int id, [Bind("IdProduto,Nome,Descricao,Tamanho,Cor,Preco,Estoque,IdCategoria,IdFornecedor")] Produto produto)
     {
         if (id != produto.IdProduto)
@@ -117,6 +154,7 @@ public class ProdutoController : Controller
         return RedirectToAction(nameof(Index));
     }
 
+    [RequireUser("Estrategico", "Tatico")]
     public async Task<IActionResult> Delete(int? id)
     {
         if (id == null)
@@ -139,6 +177,7 @@ public class ProdutoController : Controller
 
     [HttpPost, ActionName("Delete")]
     [ValidateAntiForgeryToken]
+    [RequireUser("Estrategico")]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
         var produto = await _context.Produtos.FindAsync(id);
@@ -146,6 +185,7 @@ public class ProdutoController : Controller
         {
             _context.Produtos.Remove(produto);
             await _context.SaveChangesAsync();
+            await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Produto removido: {produto.Nome}.");
         }
 
         return RedirectToAction(nameof(Index));

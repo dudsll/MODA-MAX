@@ -1,0 +1,4 @@
+@model modamax.web.Models.Categoria
+@{ ViewData["Title"] = "Excluir categoria"; }
+<div class="page-header"><div><p class="section-kicker">Cadastros</p><h1>Excluir categoria</h1></div><a class="btn btn-outline-secondary" asp-action="Index">Voltar</a></div>
+<div class="content-card details-card"><p>Confirme a exclusao da categoria <strong>@Model.Nome</strong>.</p><form asp-action="Delete" asp-route-id="@Model.IdCategoria"><button class="btn btn-danger" type="submit">Excluir</button></form></div>

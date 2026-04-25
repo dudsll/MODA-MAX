@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
+using modamax.web.Filters;
 using modamax.web.Models;
 
 namespace modamax.web.Controllers;
 
+[RequireUser("Estrategico", "Tatico", "Operacional")]
 public class ClienteController : Controller
 {
     private readonly AppDbContext _context;
@@ -54,6 +56,7 @@ public class ClienteController : Controller
 
         _context.Add(cliente);
         await _context.SaveChangesAsync();
+        await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Cliente cadastrado: {cliente.Nome}.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -102,6 +105,7 @@ public class ClienteController : Controller
             throw;
         }
 
+        await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Cliente alterado: {cliente.Nome}.");
         return RedirectToAction(nameof(Index));
     }
 
@@ -130,6 +134,7 @@ public class ClienteController : Controller
         {
             _context.Clientes.Remove(cliente);
             await _context.SaveChangesAsync();
+            await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Cliente removido: {cliente.Nome}.");
         }
 
         return RedirectToAction(nameof(Index));

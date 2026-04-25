@@ -1,0 +1,14 @@
+@model modamax.web.ViewModels.RelatorioViewModel
+@{ ViewData["Title"] = "Relatorios"; }
+<div class="page-header"><div><p class="section-kicker">Analises</p><h1>Relatorios</h1><p class="page-copy">Produtos mais vendidos e vendas por periodo.</p></div></div>
+<div class="content-card">
+    <form method="get" class="row g-3 mb-4">
+        <div class="col-md-3"><label class="form-label">Data inicial</label><input type="date" name="dataInicial" value="@(Model.DataInicial?.ToString("yyyy-MM-dd"))" class="form-control" /></div>
+        <div class="col-md-3"><label class="form-label">Data final</label><input type="date" name="dataFinal" value="@(Model.DataFinal?.ToString("yyyy-MM-dd"))" class="form-control" /></div>
+        <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Gerar</button></div>
+    </form>
+</div>
+<div class="content-grid">
+    <article class="content-card"><h2>Produtos mais vendidos</h2><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Produto</th><th>Quantidade</th><th>Faturamento</th></tr></thead><tbody>@foreach (var item in Model.ProdutosMaisVendidos){<tr><td>@item.Produto</td><td>@item.QuantidadeVendida</td><td>@item.Faturamento.ToString("C")</td></tr>}</tbody></table></div></article>
+    <article class="content-card"><h2>Vendas por periodo</h2><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Periodo</th><th>Pedidos</th><th>Total</th></tr></thead><tbody>@foreach (var item in Model.VendasPorPeriodo){<tr><td>@item.Periodo</td><td>@item.Pedidos</td><td>@item.Total.ToString("C")</td></tr>}</tbody></table></div></article>
+</div>
