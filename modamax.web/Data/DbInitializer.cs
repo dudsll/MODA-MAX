@@ -8,6 +8,7 @@ public static class DbInitializer
     public static void Initialize(AppDbContext context)
     {
         context.Database.EnsureCreated();
+        EnsureLogSistemaTable(context);
 
         if (context.Usuarios.Any())
         {
@@ -108,5 +109,22 @@ public static class DbInitializer
         context.MovimentacoesEstoque.AddRange(movimentacoes);
         context.LogsSistema.AddRange(logs);
         context.SaveChanges();
+    }
+
+    private static void EnsureLogSistemaTable(AppDbContext context)
+    {
+        context.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "LogSistema" (
+                "IdLog" INTEGER NOT NULL CONSTRAINT "PK_LogSistema" PRIMARY KEY AUTOINCREMENT,
+                "IdUsuario" INTEGER NULL,
+                "Acao" TEXT NOT NULL,
+                "Data" TEXT NOT NULL,
+                CONSTRAINT "FK_LogSistema_Usuario_IdUsuario" FOREIGN KEY ("IdUsuario") REFERENCES "Usuario" ("IdUsuario") ON DELETE SET NULL
+            );
+            """);
+
+        context.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_LogSistema_IdUsuario" ON "LogSistema" ("IdUsuario");
+            """);
     }
 }

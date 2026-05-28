@@ -1,0 +1,37 @@
+@model IEnumerable<modamax.web.Models.LogSistema>
+
+@{
+    ViewData["Title"] = "Logs";
+}
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Auditoria</p>
+        <h1>Logs do sistema</h1>
+        <p class="page-copy">Acompanhe as principais acoes registradas pelos usuarios.</p>
+    </div>
+</div>
+
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="table table-modern align-middle">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Usuario</th>
+                    <th>Acao</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var log in Model)
+            {
+                <tr>
+                    <td>@log.Data.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td>@(log.Usuario?.Nome ?? "Sistema")</td>
+                    <td>@log.Acao</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
