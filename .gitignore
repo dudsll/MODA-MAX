@@ -95,6 +95,11 @@ bld/
 [Bb]in/
 [Oo]bj/
 [Ll]og/
+!modamax.web/Views/Log/
+!modamax.web/Views/Log/**
+**/App_Data/DataProtectionKeys/
+*.db-shm
+*.db-wal
 
 # Visual Studio 2015/2017 cache/options directory
 .vs/

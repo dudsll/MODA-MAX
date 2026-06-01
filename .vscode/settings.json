@@ -1,0 +1,4 @@
+{
+  "appService.defaultWebAppToDeploy": "/subscriptions/fe38745a-268c-42f3-9354-0ebaf6c2d5e4/resourceGroups/modamax_group-bbbf/providers/Microsoft.Web/sites/modamax",
+  "appService.deploySubpath": "modamax.web\\bin\\Release\\net7.0\\publish"
+}
