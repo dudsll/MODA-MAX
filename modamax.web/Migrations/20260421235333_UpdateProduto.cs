@@ -17,7 +17,7 @@ namespace modamax.web.Migrations
                     Id = table.Column<int>(type: "INTEGER", nullable: false)
                         .Annotation("Sqlite:Autoincrement", true),
                     Nome = table.Column<string>(type: "TEXT", nullable: true),
-                    Preco = table.Column<decimal>(type: "TEXT", nullable: false),
+                    Preço = table.Column<decimal>(type: "TEXT", nullable: false),
                     Estoque = table.Column<int>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>

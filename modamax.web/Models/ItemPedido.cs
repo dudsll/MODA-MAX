@@ -16,7 +16,7 @@ public class ItemPedido
     public int Quantidade { get; set; }
 
     [Column(TypeName = "decimal(10,2)")]
-    [Display(Name = "Preco Unitario")]
+    [Display(Name = "Preço Unitário")]
     public decimal PrecoUnitario { get; set; }
 
     [Column(TypeName = "decimal(10,2)")]
