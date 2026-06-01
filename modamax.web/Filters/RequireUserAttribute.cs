@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using System.Globalization;
+using System.Text;
 
 namespace modamax.web.Filters;
 
@@ -25,7 +27,8 @@ public class RequireUserAttribute : Attribute, IAsyncActionFilter
         if (_niveis.Length > 0)
         {
             var nivelAtual = context.HttpContext.Session.GetString("UsuarioNivel");
-            var permitido = _niveis.Any(n => string.Equals(n, nivelAtual, StringComparison.OrdinalIgnoreCase));
+            var nivelAtualNormalizado = NormalizeText(nivelAtual);
+            var permitido = _niveis.Any(n => string.Equals(NormalizeText(n), nivelAtualNormalizado, StringComparison.OrdinalIgnoreCase));
 
             if (!permitido)
             {
@@ -35,5 +38,26 @@ public class RequireUserAttribute : Attribute, IAsyncActionFilter
         }
 
         await next();
+    }
+
+    private static string NormalizeText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return string.Empty;
+        }
+
+        var normalized = value.Normalize(NormalizationForm.FormD);
+        var sb = new StringBuilder(normalized.Length);
+
+        foreach (var c in normalized)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+            {
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString().Normalize(NormalizationForm.FormC);
     }
 }

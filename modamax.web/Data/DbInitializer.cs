@@ -8,6 +8,8 @@ public static class DbInitializer
     public static void Initialize(AppDbContext context)
     {
         context.Database.EnsureCreated();
+        EnsureLogSistemaTable(context);
+        NormalizeLegacyValues(context);
 
         if (context.Usuarios.Any())
         {
@@ -62,7 +64,7 @@ public static class DbInitializer
             new() { IdPedido = 1, IdCliente = 1, DataPedido = new DateTime(2026, 6, 1), TiposVenda = "Varejo", Status = "Finalizado", ValorTotal = 160.73m },
             new() { IdPedido = 2, IdCliente = 2, DataPedido = new DateTime(2026, 6, 1), TiposVenda = "Varejo", Status = "Finalizado", ValorTotal = 120.75m },
             new() { IdPedido = 3, IdCliente = 3, DataPedido = new DateTime(2026, 6, 2), TiposVenda = "Varejo", Status = "Finalizado", ValorTotal = 170.97m },
-            new() { IdPedido = 4, IdCliente = 4, DataPedido = new DateTime(2026, 6, 3), TiposVenda = "Varejo", Status = "Em separacao", ValorTotal = 140.00m },
+            new() { IdPedido = 4, IdCliente = 4, DataPedido = new DateTime(2026, 6, 3), TiposVenda = "Varejo", Status = "Em separação", ValorTotal = 140.00m },
             new() { IdPedido = 5, IdCliente = 5, DataPedido = new DateTime(2026, 6, 3), TiposVenda = "Varejo", Status = "Finalizado", ValorTotal = 98.60m }
         };
 
@@ -77,8 +79,8 @@ public static class DbInitializer
 
         var usuarios = new List<Usuario>
         {
-            new() { IdUsuario = 1, Nome = "Diretoria ModaMax", Email = "estrategico@modamax.com", Senha = "123456", Nivel = "Estrategico" },
-            new() { IdUsuario = 2, Nome = "Gestora Comercial", Email = "tatico@modamax.com", Senha = "123456", Nivel = "Tatico" },
+            new() { IdUsuario = 1, Nome = "Diretoria ModaMax", Email = "estrategico@modamax.com", Senha = "123456", Nivel = "Estratégico" },
+            new() { IdUsuario = 2, Nome = "Gestora Comercial", Email = "tatico@modamax.com", Senha = "123456", Nivel = "Tático" },
             new() { IdUsuario = 3, Nome = "Operador de Loja", Email = "operacional@modamax.com", Senha = "123456", Nivel = "Operacional" }
         };
 
@@ -108,5 +110,43 @@ public static class DbInitializer
         context.MovimentacoesEstoque.AddRange(movimentacoes);
         context.LogsSistema.AddRange(logs);
         context.SaveChanges();
+    }
+
+    private static void EnsureLogSistemaTable(AppDbContext context)
+    {
+        context.Database.ExecuteSqlRaw("""
+            CREATE TABLE IF NOT EXISTS "LogSistema" (
+                "IdLog" INTEGER NOT NULL CONSTRAINT "PK_LogSistema" PRIMARY KEY AUTOINCREMENT,
+                "IdUsuario" INTEGER NULL,
+                "Acao" TEXT NOT NULL,
+                "Data" TEXT NOT NULL,
+                CONSTRAINT "FK_LogSistema_Usuario_IdUsuario" FOREIGN KEY ("IdUsuario") REFERENCES "Usuario" ("IdUsuario") ON DELETE SET NULL
+            );
+            """);
+
+        context.Database.ExecuteSqlRaw("""
+            CREATE INDEX IF NOT EXISTS "IX_LogSistema_IdUsuario" ON "LogSistema" ("IdUsuario");
+            """);
+    }
+
+    private static void NormalizeLegacyValues(AppDbContext context)
+    {
+        context.Database.ExecuteSqlRaw("""
+            UPDATE "Pedido"
+            SET "Status" = 'Em separação'
+            WHERE "Status" = 'Em separacao';
+            """);
+
+        context.Database.ExecuteSqlRaw("""
+            UPDATE "Usuario"
+            SET "Nivel" = 'Estratégico'
+            WHERE "Nivel" = 'Estrategico';
+            """);
+
+        context.Database.ExecuteSqlRaw("""
+            UPDATE "Usuario"
+            SET "Nivel" = 'Tático'
+            WHERE "Nivel" = 'Tatico';
+            """);
     }
 }

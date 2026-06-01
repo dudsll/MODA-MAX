@@ -31,7 +31,7 @@ namespace modamax.web.Migrations
                     b.Property<string>("Nome")
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("Preco")
+                    b.Property<decimal>("Preço")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");

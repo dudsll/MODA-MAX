@@ -14,7 +14,7 @@ public class Produto
     [StringLength(200)]
     public string Nome { get; set; } = string.Empty;
 
-    [Display(Name = "Descricao")]
+    [Display(Name = "Descrição")]
     [StringLength(500)]
     public string? Descricao { get; set; }
 
@@ -26,9 +26,9 @@ public class Produto
     [StringLength(30)]
     public string Cor { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Informe o preco.")]
-    [Column(TypeName = "decimal(10,2)")]
-    [Display(Name = "Preco")]
+    [Required(ErrorMessage = "Informe o preço.")]
+    [Column("Preco", TypeName = "decimal(10,2)")]
+    [Display(Name = "Preço")]
     public decimal Preco { get; set; }
 
     [Required(ErrorMessage = "Informe o estoque.")]

@@ -2,6 +2,12 @@
 @{
     var usuarioNome = Context.Session.GetString("UsuarioNome");
     var usuarioNivel = Context.Session.GetString("UsuarioNivel");
+    var usuarioNivelExibicao = usuarioNivel switch
+    {
+        "Estrategico" => "Estratégico",
+        "Tatico" => "Tático",
+        _ => usuarioNivel
+    };
     var logado = !string.IsNullOrWhiteSpace(usuarioNome);
 }
 
@@ -23,7 +29,7 @@
                     <span class="brand-mark">M</span>
                     <span>
                         <strong>ModaMax</strong>
-                        <small>Sistema de gestao</small>
+                        <small>Sistema de gestão</small>
                     </span>
                 </a>
 
@@ -35,12 +41,13 @@
                         <a asp-controller="Categoria" asp-action="Index">Categorias</a>
                         <a asp-controller="Cliente" asp-action="Index">Clientes</a>
                         <a asp-controller="Pedido" asp-action="Index">Pedidos</a>
-                        <a asp-controller="Pedido" asp-action="Historico">Historico</a>
-                        <a asp-controller="Relatorio" asp-action="Index">Relatorios</a>
+                        <a asp-controller="Pedido" asp-action="Historico">Histórico</a>
+                        <a asp-controller="Relatorio" asp-action="Index">Relatórios</a>
 
-                        @if (usuarioNivel == "Estrategico")
+                        @if (string.Equals(usuarioNivel, "Estratégico", StringComparison.OrdinalIgnoreCase) ||
+                             string.Equals(usuarioNivel, "Estrategico", StringComparison.OrdinalIgnoreCase))
                         {
-                            <a asp-controller="Usuario" asp-action="Index">Usuarios</a>
+                            <a asp-controller="Usuario" asp-action="Index">Usuários</a>
                             <a asp-controller="Log" asp-action="Index">Logs</a>
                         }
                     }
@@ -49,7 +56,7 @@
                 <div class="user-pill">
                     @if (logado)
                     {
-                        <span>@usuarioNome (@usuarioNivel)</span>
+                        <span>@usuarioNome (@usuarioNivelExibicao)</span>
                         <a class="btn btn-sm btn-outline-secondary" asp-controller="Account" asp-action="Logout">Sair</a>
                     }
                     else
