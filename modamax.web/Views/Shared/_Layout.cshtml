@@ -35,12 +35,12 @@
                         <a asp-controller="Categoria" asp-action="Index">Categorias</a>
                         <a asp-controller="Cliente" asp-action="Index">Clientes</a>
                         <a asp-controller="Pedido" asp-action="Index">Pedidos</a>
-                        <a asp-controller="Pedido" asp-action="Historico">Historico</a>
-                        <a asp-controller="Relatorio" asp-action="Index">Relatorios</a>
+                        <a asp-controller="Pedido" asp-action="Historico">Histórico</a>
+                        <a asp-controller="Relatorio" asp-action="Index">Relatórios</a>
 
                         @if (usuarioNivel == "Estrategico")
                         {
-                            <a asp-controller="Usuario" asp-action="Index">Usuarios</a>
+                            <a asp-controller="Usuario" asp-action="Index">Usuários</a>
                             <a asp-controller="Log" asp-action="Index">Logs</a>
                         }
                     }

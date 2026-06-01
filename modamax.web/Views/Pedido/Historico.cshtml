@@ -1,9 +1,9 @@
 @model IEnumerable<modamax.web.Models.Pedido>
 @{
-    ViewData["Title"] = "Historico de pedidos";
+    ViewData["Title"] = "Histórico de pedidos";
     var clientes = ViewBag.Clientes as List<modamax.web.Models.Cliente> ?? new();
 }
-<div class="page-header"><div><p class="section-kicker">Historico</p><h1>Historico de pedidos</h1></div></div>
+<div class="page-header"><div><p class="section-kicker">Histórico</p><h1>Histórico de pedidos</h1></div></div>
 <div class="content-card">
     <form method="get" class="row g-3 mb-4">
         <div class="col-md-4">
