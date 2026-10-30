@@ -1,0 +1,6 @@
+bin/
+obj/
+publish/
+App_Data/
+*.db
+appsettings.Development.json

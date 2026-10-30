@@ -1,0 +1,34 @@
+# Ambiente completo do ModaMax: SQL Server + aplicacao Web/API.
+#   Subir tudo:            docker compose up -d --build
+#   Subir so o banco:      docker compose up -d sqlserver   (para rodar a Web com dotnet run)
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    platform: linux/amd64 # em Macs Apple Silicon roda via Rosetta (Docker Desktop)
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${SA_PASSWORD:-ModaMax@Dev2026}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  web:
+    build: ./modamax.web
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Server=sqlserver,1433;Database=ModaMax;User Id=sa;Password=${SA_PASSWORD:-ModaMax@Dev2026};TrustServerCertificate=True"
+      Jwt__Key: ${JWT_KEY:-chave-de-desenvolvimento-modamax-trocar-em-producao-123456}
+    ports:
+      - "8080:8080"
+
+volumes:
+  sqlserver-data:

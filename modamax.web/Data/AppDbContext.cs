@@ -32,6 +32,31 @@ public class AppDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // As tabelas com trigger precisam ser declaradas para o EF Core nao usar
+        // OUTPUT direto no SQL Server, o que falharia nessas tabelas.
+        modelBuilder.Entity<Produto>().ToTable(t =>
+        {
+            t.HasTrigger("trg_Produto_AuditaPreco");
+            t.HasCheckConstraint("CK_Produto_Estoque", "[Estoque] >= 0");
+            t.HasCheckConstraint("CK_Produto_Preco", "[Preco] >= 0");
+        });
+
+        modelBuilder.Entity<Pedido>().ToTable(t =>
+        {
+            t.HasTrigger("trg_Pedido_AuditaStatus");
+            t.HasCheckConstraint("CK_Pedido_ValorTotal", "[ValorTotal] >= 0");
+        });
+
+        modelBuilder.Entity<ItemPedido>().ToTable(t =>
+            t.HasCheckConstraint("CK_ItemPedido_Quantidade", "[Quantidade] > 0"));
+
+        modelBuilder.Entity<Usuario>()
+            .HasIndex(u => u.Email)
+            .IsUnique();
+
+        modelBuilder.Entity<Pedido>()
+            .HasIndex(p => p.DataPedido);
+
         modelBuilder.Entity<Produto>()
             .HasOne(p => p.Categoria)
             .WithMany(c => c.Produtos)

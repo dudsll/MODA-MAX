@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
+using modamax.web.Services;
 using modamax.web.ViewModels;
 
 namespace modamax.web.Controllers;
@@ -35,9 +36,9 @@ public class AccountController : Controller
         }
 
         var usuario = await _context.Usuarios
-            .FirstOrDefaultAsync(u => u.Email == viewModel.Email && u.Senha == viewModel.Senha);
+            .FirstOrDefaultAsync(u => u.Email == viewModel.Email);
 
-        if (usuario == null)
+        if (usuario == null || !SenhaService.Verificar(usuario, viewModel.Senha))
         {
             ModelState.AddModelError(string.Empty, "Email ou senha invalidos.");
             return View(viewModel);
@@ -80,7 +81,7 @@ public class AccountController : Controller
             return View(viewModel);
         }
 
-        usuario.Senha = viewModel.NovaSenha;
+        usuario.Senha = SenhaService.GerarHash(usuario, viewModel.NovaSenha);
         await _context.SaveChangesAsync();
         TempData["Mensagem"] = "Senha atualizada com sucesso.";
         return RedirectToAction(nameof(Login));

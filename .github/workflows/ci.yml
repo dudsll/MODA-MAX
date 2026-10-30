@@ -1,0 +1,54 @@
+# Integracao continua do ModaMax: compila a Web/API, gera o script do banco,
+# valida o app Flutter e monta a imagem Docker a cada push ou pull request.
+name: CI
+
+on:
+  push:
+    branches: [main, "pim4/**"]
+  pull_request:
+
+jobs:
+  web:
+    name: Web + API (.NET)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Restaurar pacotes
+        run: dotnet restore modamax.web/modamax.web.csproj
+      - name: Compilar
+        run: dotnet build modamax.web/modamax.web.csproj -c Release --no-restore
+      - name: Gerar script do banco a partir das migrations
+        run: |
+          dotnet tool install --global dotnet-ef
+          dotnet ef migrations script --project modamax.web -o banco.sql
+      - uses: actions/upload-artifact@v4
+        with:
+          name: script-banco
+          path: banco.sql
+
+  mobile:
+    name: App Mobile (Flutter)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modamax_mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+
+  docker:
+    name: Imagem Docker
+    runs-on: ubuntu-latest
+    needs: web
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build da imagem
+        run: docker build -t modamax-web:${{ github.sha }} modamax.web
