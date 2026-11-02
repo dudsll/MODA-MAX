@@ -1,0 +1,15 @@
+@{
+    ViewData["Title"] = "Link inválido";
+}
+
+<div class="auth-shell">
+    <div class="content-card auth-card">
+        <p class="section-kicker">Recuperação</p>
+        <h1>Link inválido ou expirado</h1>
+        <p>Este link de redefinição já foi usado ou passou do prazo de 30 minutos.</p>
+        <div class="d-flex gap-2">
+            <a class="btn btn-primary" asp-action="RecuperarSenha">Pedir um novo link</a>
+            <a class="btn btn-outline-secondary" asp-action="Login">Voltar ao login</a>
+        </div>
+    </div>
+</div>

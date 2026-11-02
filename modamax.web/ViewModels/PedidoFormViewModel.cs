@@ -22,19 +22,23 @@ public class PedidoFormViewModel
     [Required]
     public string Status { get; set; } = "Finalizado";
 
-    [Required]
-    [Display(Name = "Produto")]
-    public int IdProduto { get; set; }
-
-    [Range(1, int.MaxValue)]
-    public int Quantidade { get; set; } = 1;
-
-    [Display(Name = "Desconto")]
-    public decimal Desconto { get; set; }
+    public List<PedidoItemFormViewModel> Itens { get; set; } = new();
 
     public decimal ValorTotal { get; set; }
 
     public List<Cliente> Clientes { get; set; } = new();
 
     public List<Produto> Produtos { get; set; } = new();
+}
+
+public class PedidoItemFormViewModel
+{
+    [Display(Name = "Produto")]
+    public int IdProduto { get; set; }
+
+    [Range(1, int.MaxValue, ErrorMessage = "A quantidade deve ser maior que zero.")]
+    public int Quantidade { get; set; } = 1;
+
+    [Range(0, 999999, ErrorMessage = "Desconto invalido.")]
+    public decimal Desconto { get; set; }
 }

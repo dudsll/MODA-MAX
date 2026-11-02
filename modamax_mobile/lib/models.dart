@@ -218,3 +218,30 @@ String formatarMoeda(double valor) {
 
 String formatarData(DateTime data) =>
     '${data.day.toString().padLeft(2, '0')}/${data.month.toString().padLeft(2, '0')}/${data.year}';
+
+class PontoGrafico {
+  final String rotulo;
+  final double valor;
+
+  PontoGrafico(this.rotulo, this.valor);
+
+  factory PontoGrafico.fromJson(Map<String, dynamic> json) =>
+      PontoGrafico(json['rotulo'] as String, _decimal(json['valor']));
+}
+
+class GraficosDashboard {
+  final List<PontoGrafico> vendasPorMes;
+  final List<PontoGrafico> produtosMaisVendidos;
+  final List<PontoGrafico> pedidosPorStatus;
+
+  GraficosDashboard({required this.vendasPorMes, required this.produtosMaisVendidos, required this.pedidosPorStatus});
+
+  static List<PontoGrafico> _lista(dynamic json) =>
+      (json as List<dynamic>).map((p) => PontoGrafico.fromJson(p as Map<String, dynamic>)).toList();
+
+  factory GraficosDashboard.fromJson(Map<String, dynamic> json) => GraficosDashboard(
+        vendasPorMes: _lista(json['vendasPorMes']),
+        produtosMaisVendidos: _lista(json['produtosMaisVendidos']),
+        pedidosPorStatus: _lista(json['pedidosPorStatus']),
+      );
+}

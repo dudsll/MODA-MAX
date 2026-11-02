@@ -305,6 +305,41 @@ namespace modamax.web.Migrations
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
+            modelBuilder.Entity("modamax.web.Models.RecuperacaoSenha", b =>
+                {
+                    b.Property<int>("IdRecuperacao")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdRecuperacao"));
+
+                    b.Property<DateTime>("CriadoEm")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiraEm")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("IdUsuario")
+                        .HasColumnType("int");
+
+                    b.Property<string>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("UsadoEm")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("IdRecuperacao");
+
+                    b.HasIndex("IdUsuario");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique();
+
+                    b.ToTable("RecuperacaoSenha");
+                });
+
             modelBuilder.Entity("modamax.web.Models.Usuario", b =>
                 {
                     b.Property<int>("IdUsuario")
@@ -409,6 +444,17 @@ namespace modamax.web.Migrations
                     b.Navigation("Categoria");
 
                     b.Navigation("Fornecedor");
+                });
+
+            modelBuilder.Entity("modamax.web.Models.RecuperacaoSenha", b =>
+                {
+                    b.HasOne("modamax.web.Models.Usuario", "Usuario")
+                        .WithMany()
+                        .HasForeignKey("IdUsuario")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Usuario");
                 });
 
             modelBuilder.Entity("modamax.web.Models.Categoria", b =>

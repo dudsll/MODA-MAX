@@ -1,0 +1,33 @@
+@model modamax.web.ViewModels.RedefinirSenhaViewModel
+
+@{
+    ViewData["Title"] = "Redefinir Senha";
+}
+
+<div class="auth-shell">
+    <div class="content-card auth-card">
+        <p class="section-kicker">Recuperação</p>
+        <h1>Criar nova senha</h1>
+        <form asp-action="RedefinirSenha" class="row g-3 mt-2">
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+            <input type="hidden" asp-for="Token" />
+            <div class="col-12">
+                <label asp-for="NovaSenha" class="form-label"></label>
+                <input asp-for="NovaSenha" class="form-control" autocomplete="new-password" />
+                <span asp-validation-for="NovaSenha" class="text-danger"></span>
+            </div>
+            <div class="col-12">
+                <label asp-for="ConfirmarSenha" class="form-label"></label>
+                <input asp-for="ConfirmarSenha" class="form-control" autocomplete="new-password" />
+                <span asp-validation-for="ConfirmarSenha" class="text-danger"></span>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary">Salvar nova senha</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

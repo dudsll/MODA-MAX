@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
 using modamax.web.Filters;
 using modamax.web.Models;
+using modamax.web.Services;
 using modamax.web.ViewModels;
 
 namespace modamax.web.Controllers;
@@ -12,17 +13,20 @@ public class HomeController : Controller
 {
     private readonly ILogger<HomeController> _logger;
     private readonly AppDbContext _context;
+    private readonly DashboardService _dashboardService;
 
-    public HomeController(ILogger<HomeController> logger, AppDbContext context)
+    public HomeController(ILogger<HomeController> logger, AppDbContext context, DashboardService dashboardService)
     {
         _logger = logger;
         _context = context;
+        _dashboardService = dashboardService;
     }
 
     [RequireUser("Estrategico", "Tatico", "Operacional")]
     public async Task<IActionResult> Index()
     {
         var faturamentoTotal = (await _context.Pedidos
+            .Where(p => p.Status != PedidoService.StatusCancelado)
             .Select(p => p.ValorTotal)
             .ToListAsync())
             .Sum();
@@ -49,7 +53,8 @@ public class HomeController : Controller
                 .Include(l => l.Usuario)
                 .OrderByDescending(l => l.Data)
                 .Take(5)
-                .ToListAsync()
+                .ToListAsync(),
+            Graficos = await _dashboardService.GerarGraficosAsync()
         };
 
         return View(viewModel);

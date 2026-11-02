@@ -1,4 +1,4 @@
-# Integracao continua do ModaMax: compila a Web/API, gera o script do banco,
+# Integracao continua do ModaMax: compila e testa a Web/API, gera o script do banco,
 # valida o app Flutter e monta a imagem Docker a cada push ou pull request.
 name: CI
 
@@ -20,6 +20,8 @@ jobs:
         run: dotnet restore modamax.web/modamax.web.csproj
       - name: Compilar
         run: dotnet build modamax.web/modamax.web.csproj -c Release --no-restore
+      - name: Testes automatizados
+        run: dotnet test tests/ModaMax.Tests -c Release --logger "console;verbosity=normal"
       - name: Gerar script do banco a partir das migrations
         run: |
           dotnet tool install --global dotnet-ef

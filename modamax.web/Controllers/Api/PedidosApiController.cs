@@ -54,11 +54,14 @@ public class PedidosApiController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<PedidoDto>> Criar(PedidoCriarDto dto)
     {
-        var itens = dto.Itens
-            .Select(i => new ItemPedidoEntrada { IdProduto = i.IdProduto, Quantidade = i.Quantidade, Desconto = i.Desconto })
-            .ToList();
-
-        var resultado = await _pedidoService.CriarAsync(dto.IdCliente, dto.TiposVenda, itens);
+        var resultado = await _pedidoService.CriarAsync(new DadosPedido
+        {
+            IdCliente = dto.IdCliente,
+            TiposVenda = dto.TiposVenda,
+            Itens = dto.Itens
+                .Select(i => new ItemPedidoEntrada { IdProduto = i.IdProduto, Quantidade = i.Quantidade, Desconto = i.Desconto })
+                .ToList()
+        });
         if (!resultado.Sucesso)
         {
             return BadRequest(new { mensagem = resultado.Erro });
@@ -69,13 +72,15 @@ public class PedidosApiController : ControllerBase
     }
 
     // PUT /api/pedidos/5/cancelar
+    // Mesma regra da Web: so os niveis Estrategico e Tatico cancelam pedidos.
     [HttpPut("{id:int}/cancelar")]
+    [Authorize(Roles = "Estrategico,Tatico")]
     public async Task<IActionResult> Cancelar(int id)
     {
         var resultado = await _pedidoService.CancelarAsync(id);
         if (!resultado.Sucesso)
         {
-            return resultado.Erro == "Pedido nao encontrado." ? NotFound() : BadRequest(new { mensagem = resultado.Erro });
+            return resultado.NaoEncontrado ? NotFound() : BadRequest(new { mensagem = resultado.Erro });
         }
 
         return NoContent();

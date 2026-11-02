@@ -150,7 +150,8 @@ class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
             title: const Text('Total'),
             trailing: Text(formatarMoeda(p.valorTotal), style: tema.textTheme.titleLarge),
           ),
-          if (p.status != 'Cancelado') ...[
+          // Cancelar e permitido so aos niveis Estrategico e Tatico (mesma regra da API).
+          if (p.status != 'Cancelado' && ApiService.instancia.usuario?.nivel != 'Operacional') ...[
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: _cancelando ? null : _cancelar,

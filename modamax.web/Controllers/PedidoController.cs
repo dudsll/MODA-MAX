@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
 using modamax.web.Filters;
-using modamax.web.Models;
+using modamax.web.Services;
 using modamax.web.ViewModels;
 
 namespace modamax.web.Controllers;
@@ -11,10 +11,12 @@ namespace modamax.web.Controllers;
 public class PedidoController : Controller
 {
     private readonly AppDbContext _context;
+    private readonly PedidoService _pedidoService;
 
-    public PedidoController(AppDbContext context)
+    public PedidoController(AppDbContext context, PedidoService pedidoService)
     {
         _context = context;
+        _pedidoService = pedidoService;
     }
 
     public async Task<IActionResult> Index()
@@ -44,67 +46,30 @@ public class PedidoController : Controller
 
     public async Task<IActionResult> Create()
     {
-        return View(await MontarFormularioAsync(new PedidoFormViewModel()));
+        var viewModel = new PedidoFormViewModel { Itens = { new PedidoItemFormViewModel() } };
+        return View(await MontarFormularioAsync(viewModel));
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Create(PedidoFormViewModel viewModel)
     {
-        var produto = await _context.Produtos.FindAsync(viewModel.IdProduto);
-        if (produto == null)
-        {
-            ModelState.AddModelError("IdProduto", "Produto nao encontrado.");
-        }
-        else if (viewModel.Status != "Cancelado" && produto.Estoque < viewModel.Quantidade)
-        {
-            ModelState.AddModelError("Quantidade", "Estoque insuficiente para este pedido.");
-        }
-
-        if (!ModelState.IsValid || produto == null)
+        if (!ModelState.IsValid)
         {
             return View(await MontarFormularioAsync(viewModel));
         }
 
-        var precoUnitario = CalcularPrecoUnitario(produto.Preco, viewModel.TiposVenda);
-        var total = (precoUnitario * viewModel.Quantidade) - viewModel.Desconto;
-
-        var pedido = new Pedido
+        var resultado = await _pedidoService.CriarAsync(ParaDados(viewModel));
+        if (!resultado.Sucesso)
         {
-            IdCliente = viewModel.IdCliente,
-            DataPedido = viewModel.DataPedido,
-            TiposVenda = viewModel.TiposVenda,
-            Status = viewModel.Status,
-            ValorTotal = total,
-            Itens =
-            {
-                new ItemPedido
-                {
-                    IdProduto = viewModel.IdProduto,
-                    Quantidade = viewModel.Quantidade,
-                    PrecoUnitario = precoUnitario,
-                    Desconto = viewModel.Desconto
-                }
-            }
-        };
-
-        if (viewModel.Status != "Cancelado")
-        {
-            produto.Estoque -= viewModel.Quantidade;
-            _context.MovimentacoesEstoque.Add(new MovimentacaoEstoque
-            {
-                IdProduto = viewModel.IdProduto,
-                Tipo = "Saida",
-                Quantidade = viewModel.Quantidade,
-                Data = DateTime.Now,
-                Observacao = "Pedido criado"
-            });
+            ModelState.AddModelError(string.Empty, resultado.Erro!);
+            return View(await MontarFormularioAsync(viewModel));
         }
 
-        _context.Pedidos.Add(pedido);
-        await _context.SaveChangesAsync();
-        await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Pedido criado para o cliente {pedido.IdCliente}.");
-        return RedirectToAction(nameof(Index));
+        await AuditoriaHelper.RegistrarAsync(_context, HttpContext,
+            $"Pedido #{resultado.Pedido!.IdPedido} criado para o cliente {resultado.Pedido.IdCliente} ({resultado.Pedido.Itens.Count} itens).");
+        TempData["Mensagem"] = $"Pedido #{resultado.Pedido.IdPedido} registrado.";
+        return RedirectToAction(nameof(Details), new { id = resultado.Pedido.IdPedido });
     }
 
     public async Task<IActionResult> Edit(int? id)
@@ -113,11 +78,11 @@ public class PedidoController : Controller
 
         var pedido = await _context.Pedidos
             .Include(p => p.Itens)
+            .AsNoTracking()
             .FirstOrDefaultAsync(p => p.IdPedido == id);
 
         if (pedido == null) return NotFound();
 
-        var item = pedido.Itens.FirstOrDefault();
         var viewModel = new PedidoFormViewModel
         {
             IdPedido = pedido.IdPedido,
@@ -125,10 +90,10 @@ public class PedidoController : Controller
             DataPedido = pedido.DataPedido,
             TiposVenda = pedido.TiposVenda,
             Status = pedido.Status,
-            IdProduto = item?.IdProduto ?? 0,
-            Quantidade = item?.Quantidade ?? 1,
-            Desconto = item?.Desconto ?? 0m,
-            ValorTotal = pedido.ValorTotal
+            ValorTotal = pedido.ValorTotal,
+            Itens = pedido.Itens
+                .Select(i => new PedidoItemFormViewModel { IdProduto = i.IdProduto, Quantidade = i.Quantidade, Desconto = i.Desconto })
+                .ToList()
         };
 
         return View(await MontarFormularioAsync(viewModel));
@@ -140,72 +105,22 @@ public class PedidoController : Controller
     {
         if (id != viewModel.IdPedido) return NotFound();
 
-        var pedido = await _context.Pedidos
-            .Include(p => p.Itens)
-            .FirstOrDefaultAsync(p => p.IdPedido == id);
-
-        if (pedido == null) return NotFound();
-
-        var item = pedido.Itens.First();
-        var produtoAnterior = await _context.Produtos.FindAsync(item.IdProduto);
-        if (produtoAnterior != null && pedido.Status != "Cancelado")
-        {
-            produtoAnterior.Estoque += item.Quantidade;
-            _context.MovimentacoesEstoque.Add(new MovimentacaoEstoque
-            {
-                IdProduto = produtoAnterior.IdProduto,
-                Tipo = "Entrada",
-                Quantidade = item.Quantidade,
-                Data = DateTime.Now,
-                Observacao = $"Ajuste do pedido #{pedido.IdPedido}"
-            });
-        }
-
-        var produtoNovo = await _context.Produtos.FindAsync(viewModel.IdProduto);
-        if (produtoNovo == null)
-        {
-            ModelState.AddModelError("IdProduto", "Produto nao encontrado.");
-        }
-        else if (viewModel.Status != "Cancelado" && produtoNovo.Estoque < viewModel.Quantidade)
-        {
-            ModelState.AddModelError("Quantidade", "Estoque insuficiente para atualizar o pedido.");
-        }
-
-        if (!ModelState.IsValid || produtoNovo == null)
+        if (!ModelState.IsValid)
         {
             return View(await MontarFormularioAsync(viewModel));
         }
 
-        var precoUnitario = CalcularPrecoUnitario(produtoNovo.Preco, viewModel.TiposVenda);
-        var total = (precoUnitario * viewModel.Quantidade) - viewModel.Desconto;
-
-        pedido.IdCliente = viewModel.IdCliente;
-        pedido.DataPedido = viewModel.DataPedido;
-        pedido.TiposVenda = viewModel.TiposVenda;
-        pedido.Status = viewModel.Status;
-        pedido.ValorTotal = total;
-
-        item.IdProduto = viewModel.IdProduto;
-        item.Quantidade = viewModel.Quantidade;
-        item.PrecoUnitario = precoUnitario;
-        item.Desconto = viewModel.Desconto;
-
-        if (viewModel.Status != "Cancelado")
+        var resultado = await _pedidoService.AtualizarAsync(id, ParaDados(viewModel));
+        if (resultado.NaoEncontrado) return NotFound();
+        if (!resultado.Sucesso)
         {
-            produtoNovo.Estoque -= viewModel.Quantidade;
-            _context.MovimentacoesEstoque.Add(new MovimentacaoEstoque
-            {
-                IdProduto = produtoNovo.IdProduto,
-                Tipo = "Saida",
-                Quantidade = viewModel.Quantidade,
-                Data = DateTime.Now,
-                Observacao = $"Pedido #{pedido.IdPedido} atualizado"
-            });
+            ModelState.AddModelError(string.Empty, resultado.Erro!);
+            return View(await MontarFormularioAsync(viewModel));
         }
 
-        await _context.SaveChangesAsync();
-        await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Pedido atualizado: #{pedido.IdPedido}.");
-        return RedirectToAction(nameof(Index));
+        await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Pedido atualizado: #{id}.");
+        TempData["Mensagem"] = $"Pedido #{id} atualizado.";
+        return RedirectToAction(nameof(Details), new { id });
     }
 
     public async Task<IActionResult> Delete(int? id)
@@ -226,33 +141,10 @@ public class PedidoController : Controller
     [RequireUser("Estrategico", "Tatico")]
     public async Task<IActionResult> DeleteConfirmed(int id)
     {
-        var pedido = await _context.Pedidos
-            .Include(p => p.Itens)
-            .FirstOrDefaultAsync(p => p.IdPedido == id);
-
-        if (pedido != null)
+        var resultado = await _pedidoService.ExcluirAsync(id);
+        if (resultado.Sucesso)
         {
-            var item = pedido.Itens.FirstOrDefault();
-            if (item != null && pedido.Status != "Cancelado")
-            {
-                var produto = await _context.Produtos.FindAsync(item.IdProduto);
-                if (produto != null)
-                {
-                    produto.Estoque += item.Quantidade;
-                    _context.MovimentacoesEstoque.Add(new MovimentacaoEstoque
-                    {
-                        IdProduto = produto.IdProduto,
-                        Tipo = "Entrada",
-                        Quantidade = item.Quantidade,
-                        Data = DateTime.Now,
-                        Observacao = $"Exclusao do pedido #{pedido.IdPedido}"
-                    });
-                }
-            }
-
-            _context.Pedidos.Remove(pedido);
-            await _context.SaveChangesAsync();
-            await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Pedido excluido: #{pedido.IdPedido}.");
+            await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Pedido excluido: #{id}.");
         }
 
         return RedirectToAction(nameof(Index));
@@ -263,35 +155,16 @@ public class PedidoController : Controller
     [RequireUser("Estrategico", "Tatico")]
     public async Task<IActionResult> Cancelar(int id)
     {
-        var pedido = await _context.Pedidos.Include(p => p.Itens).FirstOrDefaultAsync(p => p.IdPedido == id);
-        if (pedido == null) return NotFound();
+        var resultado = await _pedidoService.CancelarAsync(id);
+        if (resultado.NaoEncontrado) return NotFound();
 
-        if (pedido.Status != "Cancelado")
+        if (resultado.Sucesso)
         {
-            var item = pedido.Itens.FirstOrDefault();
-            if (item != null)
-            {
-                var produto = await _context.Produtos.FindAsync(item.IdProduto);
-                if (produto != null)
-                {
-                    produto.Estoque += item.Quantidade;
-                    _context.MovimentacoesEstoque.Add(new MovimentacaoEstoque
-                    {
-                        IdProduto = produto.IdProduto,
-                        Tipo = "Entrada",
-                        Quantidade = item.Quantidade,
-                        Data = DateTime.Now,
-                        Observacao = $"Cancelamento do pedido #{pedido.IdPedido}"
-                    });
-                }
-            }
-
-            pedido.Status = "Cancelado";
-            await _context.SaveChangesAsync();
-            await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Pedido cancelado: #{pedido.IdPedido}.");
+            await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Pedido cancelado: #{id}.");
+            TempData["Mensagem"] = $"Pedido #{id} cancelado e itens devolvidos ao estoque.";
         }
 
-        return RedirectToAction(nameof(Index));
+        return RedirectToAction(nameof(Details), new { id });
     }
 
     public async Task<IActionResult> Historico(int? clienteId)
@@ -314,15 +187,24 @@ public class PedidoController : Controller
 
     private async Task<PedidoFormViewModel> MontarFormularioAsync(PedidoFormViewModel viewModel)
     {
-        viewModel.Clientes = await _context.Clientes.OrderBy(c => c.Nome).ToListAsync();
-        viewModel.Produtos = await _context.Produtos.OrderBy(p => p.Nome).ToListAsync();
+        viewModel.Clientes = await _context.Clientes.AsNoTracking().OrderBy(c => c.Nome).ToListAsync();
+        viewModel.Produtos = await _context.Produtos.AsNoTracking().OrderBy(p => p.Nome).ToListAsync();
+        if (viewModel.Itens.Count == 0)
+        {
+            viewModel.Itens.Add(new PedidoItemFormViewModel());
+        }
+
         return viewModel;
     }
 
-    private static decimal CalcularPrecoUnitario(decimal precoBase, string tipoVenda)
+    private static DadosPedido ParaDados(PedidoFormViewModel viewModel) => new()
     {
-        return string.Equals(tipoVenda, "Atacado", StringComparison.OrdinalIgnoreCase)
-            ? Math.Round(precoBase * 0.9m, 2)
-            : precoBase;
-    }
+        IdCliente = viewModel.IdCliente,
+        DataPedido = viewModel.DataPedido,
+        TiposVenda = viewModel.TiposVenda,
+        Status = viewModel.Status,
+        Itens = viewModel.Itens
+            .Select(i => new ItemPedidoEntrada { IdProduto = i.IdProduto, Quantidade = i.Quantidade, Desconto = i.Desconto })
+            .ToList()
+    };
 }
