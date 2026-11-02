@@ -57,6 +57,54 @@
     </article>
 </section>
 
+<section class="charts-grid">
+    <article class="content-card chart-card chart-card-wide">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Vendas</p>
+                <h2>Faturamento por mês</h2>
+            </div>
+            <a class="btn btn-outline-primary" asp-controller="Relatorio" asp-action="Index">Ver relatório</a>
+        </div>
+        <div class="chart-box">
+            <canvas id="grafico-vendas" role="img" aria-label="@string.Join(", ", Model.Graficos.VendasPorMes.Select(p => $"{p.Rotulo}: {p.Valor:C}"))"></canvas>
+        </div>
+    </article>
+    <article class="content-card chart-card">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Produtos</p>
+                <h2>Mais vendidos</h2>
+            </div>
+        </div>
+        <div class="chart-box">
+            <canvas id="grafico-produtos" role="img" aria-label="@string.Join(", ", Model.Graficos.ProdutosMaisVendidos.Select(p => $"{p.Rotulo}: {p.Valor:0} unidades"))"></canvas>
+        </div>
+    </article>
+    <article class="content-card chart-card">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Pedidos</p>
+                <h2>Pedidos por status</h2>
+            </div>
+        </div>
+        <div class="chart-box">
+            <canvas id="grafico-status" role="img" aria-label="@string.Join(", ", Model.Graficos.PedidosPorStatus.Select(p => $"{p.Rotulo}: {p.Valor:0}"))"></canvas>
+        </div>
+    </article>
+    <article class="content-card chart-card chart-card-wide">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Estoque</p>
+                <h2>Peças em estoque por categoria</h2>
+            </div>
+        </div>
+        <div class="chart-box">
+            <canvas id="grafico-estoque" role="img" aria-label="@string.Join(", ", Model.Graficos.EstoquePorCategoria.Select(p => $"{p.Rotulo}: {p.Valor:0} peças"))"></canvas>
+        </div>
+    </article>
+</section>
+
 <section class="content-grid">
     <article class="content-card">
         <div class="section-heading">
@@ -154,3 +202,71 @@
         </div>
     </article>
 </section>
+
+@section Scripts {
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script>
+        (function () {
+            if (typeof Chart === 'undefined') return; // sem internet: os cards ficam so com o texto acessivel
+
+            const graficos = @Json.Serialize(Model.Graficos);
+            const estilo = getComputedStyle(document.documentElement);
+            const cor = nome => estilo.getPropertyValue(nome).trim();
+            const paleta = [cor('--primary'), cor('--accent'), cor('--success'), '#b9775f', '#5b4636', '#e4c393'];
+            const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+            const rotulos = lista => lista.map(p => p.rotulo);
+            const valores = lista => lista.map(p => p.valor);
+
+            Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+            Chart.defaults.color = cor('--muted');
+            Chart.defaults.maintainAspectRatio = false;
+
+            new Chart(document.getElementById('grafico-vendas'), {
+                type: 'line',
+                data: {
+                    labels: rotulos(graficos.vendasPorMes),
+                    datasets: [{
+                        label: 'Faturamento',
+                        data: valores(graficos.vendasPorMes),
+                        borderColor: paleta[0],
+                        backgroundColor: 'rgba(140, 63, 47, 0.12)',
+                        fill: true,
+                        tension: 0.35,
+                        pointRadius: 4
+                    }]
+                },
+                options: {
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => moeda.format(c.parsed.y) } } },
+                    scales: { y: { beginAtZero: true, ticks: { callback: v => moeda.format(v) } } }
+                }
+            });
+
+            new Chart(document.getElementById('grafico-produtos'), {
+                type: 'bar',
+                data: {
+                    labels: rotulos(graficos.produtosMaisVendidos),
+                    datasets: [{ label: 'Unidades vendidas', data: valores(graficos.produtosMaisVendidos), backgroundColor: paleta[1], borderRadius: 6 }]
+                },
+                options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
+            });
+
+            new Chart(document.getElementById('grafico-status'), {
+                type: 'doughnut',
+                data: {
+                    labels: rotulos(graficos.pedidosPorStatus),
+                    datasets: [{ data: valores(graficos.pedidosPorStatus), backgroundColor: paleta, borderWidth: 0 }]
+                },
+                options: { cutout: '62%', plugins: { legend: { position: 'bottom' } } }
+            });
+
+            new Chart(document.getElementById('grafico-estoque'), {
+                type: 'bar',
+                data: {
+                    labels: rotulos(graficos.estoquePorCategoria),
+                    datasets: [{ label: 'Peças', data: valores(graficos.estoquePorCategoria), backgroundColor: paleta[2], borderRadius: 6 }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+            });
+        })();
+    </script>
+}

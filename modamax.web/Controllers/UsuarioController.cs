@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
 using modamax.web.Filters;
 using modamax.web.Models;
+using modamax.web.Services;
 
 namespace modamax.web.Controllers;
 
@@ -38,6 +39,7 @@ public class UsuarioController : Controller
     public async Task<IActionResult> Create([Bind("Nome,Email,Senha,Nivel")] Usuario usuario)
     {
         if (!ModelState.IsValid) return View(usuario);
+        usuario.Senha = SenhaService.GerarHash(usuario, usuario.Senha);
         _context.Usuarios.Add(usuario);
         await _context.SaveChangesAsync();
         await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Usuario cadastrado: {usuario.Email}.");
@@ -56,8 +58,22 @@ public class UsuarioController : Controller
     public async Task<IActionResult> Edit(int id, [Bind("IdUsuario,Nome,Email,Senha,Nivel")] Usuario usuario)
     {
         if (id != usuario.IdUsuario) return NotFound();
+
+        // Senha em branco na edicao significa "manter a senha atual".
+        ModelState.Remove(nameof(Usuario.Senha));
         if (!ModelState.IsValid) return View(usuario);
-        _context.Update(usuario);
+
+        var existente = await _context.Usuarios.FindAsync(id);
+        if (existente == null) return NotFound();
+
+        existente.Nome = usuario.Nome;
+        existente.Email = usuario.Email;
+        existente.Nivel = usuario.Nivel;
+        if (!string.IsNullOrWhiteSpace(usuario.Senha))
+        {
+            existente.Senha = SenhaService.GerarHash(existente, usuario.Senha);
+        }
+
         await _context.SaveChangesAsync();
         await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Usuario alterado: {usuario.Email}.");
         return RedirectToAction(nameof(Index));

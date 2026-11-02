@@ -18,8 +18,9 @@ public class Usuario
     [EmailAddress]
     public string Email { get; set; } = string.Empty;
 
+    // Guarda o hash da senha (PasswordHasher), nunca a senha em texto puro.
     [Required]
-    [StringLength(100)]
+    [StringLength(256)]
     public string Senha { get; set; } = string.Empty;
 
     [Required]

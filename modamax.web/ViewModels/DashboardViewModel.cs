@@ -1,4 +1,5 @@
 using modamax.web.Models;
+using modamax.web.Services;
 
 namespace modamax.web.ViewModels;
 
@@ -21,4 +22,6 @@ public class DashboardViewModel
     public List<Pedido> PedidosRecentes { get; set; } = new();
 
     public List<LogSistema> LogsRecentes { get; set; } = new();
+
+    public GraficosDashboard Graficos { get; set; } = new();
 }

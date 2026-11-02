@@ -1,0 +1,148 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace modamax.web.Dtos;
+
+// Objetos trafegados pela API REST (JSON). Separam o contrato da API das entidades do banco.
+
+public record LoginRequest(
+    [Required, EmailAddress] string Email,
+    [Required] string Senha);
+
+public record LoginResponse(string Token, DateTime ExpiraEm, int IdUsuario, string Nome, string Email, string Nivel);
+
+public record CategoriaDto(int IdCategoria, string Nome);
+
+public record ProdutoDto(
+    int IdProduto,
+    string Nome,
+    string? Descricao,
+    string Tamanho,
+    string Cor,
+    decimal Preco,
+    int Estoque,
+    int IdCategoria,
+    string? Categoria,
+    int IdFornecedor,
+    string? Fornecedor);
+
+public class ProdutoSalvarDto
+{
+    [Required, StringLength(200)]
+    public string Nome { get; set; } = string.Empty;
+
+    [StringLength(500)]
+    public string? Descricao { get; set; }
+
+    [Required, StringLength(10)]
+    public string Tamanho { get; set; } = string.Empty;
+
+    [Required, StringLength(30)]
+    public string Cor { get; set; } = string.Empty;
+
+    [Range(0, 999999)]
+    public decimal Preco { get; set; }
+
+    [Range(0, int.MaxValue)]
+    public int Estoque { get; set; }
+
+    public int IdCategoria { get; set; }
+
+    public int IdFornecedor { get; set; }
+}
+
+public class EntradaEstoqueDto
+{
+    [Range(1, int.MaxValue)]
+    public int Quantidade { get; set; }
+
+    [StringLength(200)]
+    public string? Observacao { get; set; }
+}
+
+public record ClienteDto(int IdCliente, string Nome, string Tipo, string Documento, string Email, string? Telefone, string? Endereco);
+
+public class ClienteSalvarDto
+{
+    [Required, StringLength(100)]
+    public string Nome { get; set; } = string.Empty;
+
+    [Required, StringLength(10)]
+    public string Tipo { get; set; } = "PF";
+
+    [Required, StringLength(20)]
+    public string Documento { get; set; } = string.Empty;
+
+    [Required, StringLength(100), EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [StringLength(20)]
+    public string? Telefone { get; set; }
+
+    [StringLength(200)]
+    public string? Endereco { get; set; }
+}
+
+public record ItemPedidoDto(int IdItem, int IdProduto, string? Produto, int Quantidade, decimal PrecoUnitario, decimal Desconto, decimal Subtotal);
+
+public record PedidoDto(
+    int IdPedido,
+    int IdCliente,
+    string? Cliente,
+    DateTime DataPedido,
+    string TiposVenda,
+    string Status,
+    decimal ValorTotal,
+    IReadOnlyList<ItemPedidoDto> Itens);
+
+public class PedidoCriarDto
+{
+    public int IdCliente { get; set; }
+
+    [Required]
+    [RegularExpression("Varejo|Atacado")]
+    public string TiposVenda { get; set; } = "Varejo";
+
+    [MinLength(1)]
+    public List<PedidoItemCriarDto> Itens { get; set; } = new();
+}
+
+public class PedidoItemCriarDto
+{
+    public int IdProduto { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int Quantidade { get; set; }
+
+    [Range(0, 999999)]
+    public decimal Desconto { get; set; }
+}
+
+public record DashboardDto(
+    int TotalProdutos,
+    int TotalClientes,
+    int TotalPedidos,
+    decimal FaturamentoTotal,
+    int ProdutosEstoqueBaixo);
+
+// Resultados das stored procedures (mapeados com Database.SqlQuery).
+public class VendaPeriodoDto
+{
+    public DateTime Dia { get; set; }
+
+    public int Pedidos { get; set; }
+
+    public int Itens { get; set; }
+
+    public decimal Total { get; set; }
+}
+
+public class EstoqueBaixoDto
+{
+    public int IdProduto { get; set; }
+
+    public string Nome { get; set; } = string.Empty;
+
+    public string Categoria { get; set; } = string.Empty;
+
+    public int Estoque { get; set; }
+}

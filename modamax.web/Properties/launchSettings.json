@@ -17,6 +17,17 @@
       },
       "dotnetRunMessages": true
     },
+    "sqlite": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5248",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Database__Provider": "Sqlite",
+        "ConnectionStrings__DefaultConnection": "Data Source=modamax_local.db"
+      },
+      "dotnetRunMessages": true
+    },
     "https": {
       "commandName": "Project",
       "launchBrowser": true,
