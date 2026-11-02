@@ -56,6 +56,7 @@ modamax.web/
 ├── Database/
 │   └── modamax_sqlserver.sql    # script completo do banco (gerado das migrations)
 ├── modamax_mobile/              # aplicativo Flutter
+├── tests/ModaMax.Tests/         # testes automatizados (xUnit)
 └── modamax.web/
     ├── Controllers/  (Api/ = API REST)
     ├── Data/
@@ -78,6 +79,16 @@ modamax.web/
 
 ## Como executar
 
+### Modo rápido, sem Docker (SQLite)
+
+Para abrir o sistema na hora, sem instalar o SQL Server:
+
+```bash
+dotnet run --project modamax.web/modamax.web.csproj --launch-profile sqlite
+```
+
+Esse modo cria um arquivo `modamax_local.db` com os dados de demonstração. Ele serve para desenvolvimento e para os testes; as procedures e triggers só existem no SQL Server, então os endpoints que usam procedure (relatório de vendas, estoque baixo e entrada de estoque) só funcionam no modo completo abaixo.
+
 ### 1. Banco de dados (SQL Server em Docker)
 
 ```bash
@@ -97,6 +108,14 @@ Na primeira execução as migrations criam as tabelas, procedures e triggers, e 
 - Web: `http://localhost:5248`
 - Documentação da API (Swagger): `http://localhost:5248/swagger`
 - Monitoramento (health check): `http://localhost:5248/health`
+
+### Testes automatizados
+
+```bash
+dotnet test tests/ModaMax.Tests
+```
+
+São 29 testes: regras de pedido (estoque, atacado, edição, cancelamento), recuperação de senha (token de uso único, expiração, hash) e testes de integração da API e das páginas, com a aplicação rodando em memória.
 
 Para subir tudo em containers (banco + Web/API em `http://localhost:8080`):
 
@@ -180,7 +199,7 @@ O controle de acesso é feito pelo filtro `RequireUserAttribute`, com base no n�
 
 ### Dashboard
 
-Exibe indicadores gerais, produtos com menor estoque, pedidos recentes e logs recentes.
+Exibe indicadores gerais e gráficos (Chart.js) de faturamento por mês, produtos mais vendidos, pedidos por status e estoque por categoria, além de produtos com menor estoque, pedidos recentes e logs. O app mobile mostra os mesmos indicadores.
 
 ### Produtos
 
@@ -196,7 +215,7 @@ Permite cadastrar, consultar, editar e excluir clientes.
 
 ### Pedidos
 
-Permite registrar pedidos, editar itens, consultar detalhes, cancelar pedidos e visualizar histórico por cliente.
+Permite registrar pedidos com vários produtos (com total estimado em tempo real), editar itens, consultar detalhes, cancelar pedidos e visualizar histórico por cliente. Web e API usam as mesmas regras (`PedidoService`): preço de atacado, validação e baixa de estoque em transação.
 
 ### Usuários
 
@@ -214,18 +233,20 @@ Permite consultar registros de auditoria do sistema. Acesso restrito ao nível E
 
 O workflow `.github/workflows/ci.yml` roda a cada push/pull request:
 
-1. compila a Web/API e gera o script do banco a partir das migrations;
+1. compila a Web/API, roda os testes automatizados e gera o script do banco a partir das migrations;
 2. roda `flutter analyze` e `flutter test` no app mobile;
 3. monta a imagem Docker da aplicação.
 
 Em produção, configure por variáveis de ambiente (nunca no repositório):
 
 - `ConnectionStrings__DefaultConnection`: conexão com o SQL Server / Azure SQL;
-- `Jwt__Key`: chave de assinatura dos tokens (mínimo de 32 caracteres).
+- `Jwt__Key`: chave de assinatura dos tokens (mínimo de 32 caracteres);
+- `Smtp__Host`, `Smtp__Porta`, `Smtp__Usuario`, `Smtp__Senha`, `Smtp__Remetente`: envio dos e-mails de recuperação de senha. Sem SMTP, o e-mail vai para o log (e, em desenvolvimento, o link aparece na tela).
 
 ## Segurança
 
 - Senhas armazenadas com hash PBKDF2 (`PasswordHasher` do ASP.NET Core Identity).
+- Recuperação de senha por link enviado por e-mail: token aleatório de uso único, válido por 30 minutos, gravado só como hash SHA-256; a resposta é a mesma exista ou não o e-mail.
 - API protegida por JWT com papéis por nível de acesso (`Estrategico`, `Tatico`, `Operacional`).
 - Web protegida por sessão e filtro de nível de acesso, com tokens antifalsificação nos formulários.
 - Regras de integridade no banco (chaves estrangeiras, `CHECK`, e-mail de usuário único).

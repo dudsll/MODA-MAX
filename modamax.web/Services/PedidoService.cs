@@ -13,19 +13,41 @@ public class ItemPedidoEntrada
     public decimal Desconto { get; set; }
 }
 
+public class DadosPedido
+{
+    public int IdCliente { get; set; }
+
+    public DateTime DataPedido { get; set; } = DateTime.Now;
+
+    public string TiposVenda { get; set; } = "Varejo";
+
+    public string Status { get; set; } = PedidoService.StatusEmSeparacao;
+
+    public IReadOnlyList<ItemPedidoEntrada> Itens { get; set; } = Array.Empty<ItemPedidoEntrada>();
+}
+
 public class ResultadoPedido
 {
     public Pedido? Pedido { get; init; }
 
     public string? Erro { get; init; }
 
+    public bool NaoEncontrado { get; init; }
+
     public bool Sucesso => Erro == null;
 }
 
-// Regras de negocio de pedidos usadas pela API: preco de atacado,
-// validacao e baixa de estoque, tudo dentro de uma transacao.
+// Regras de negocio de pedidos, usadas pela aplicacao Web e pela API:
+// preco de atacado, validacao e movimentacao de estoque, sempre em transacao.
+// Um pedido "consome" estoque enquanto o status for diferente de Cancelado.
 public class PedidoService
 {
+    public const string StatusFinalizado = "Finalizado";
+    public const string StatusEmSeparacao = "Em separação";
+    public const string StatusCancelado = "Cancelado";
+
+    public static readonly string[] StatusValidos = { StatusFinalizado, StatusEmSeparacao, StatusCancelado };
+
     private readonly AppDbContext _context;
 
     public PedidoService(AppDbContext context)
@@ -36,122 +58,195 @@ public class PedidoService
     public static decimal CalcularPrecoUnitario(decimal precoBase, string tipoVenda)
     {
         return string.Equals(tipoVenda, "Atacado", StringComparison.OrdinalIgnoreCase)
-            ? Math.Round(precoBase * 0.9m, 2)
+            // Arredondamento comercial (0,5 sobe). O padrao do Math.Round arredondaria 108,765 para 108,76.
+            ? Math.Round(precoBase * 0.9m, 2, MidpointRounding.AwayFromZero)
             : precoBase;
     }
 
-    public async Task<ResultadoPedido> CriarAsync(int idCliente, string tipoVenda, IReadOnlyList<ItemPedidoEntrada> itens)
+    private static bool ConsomeEstoque(string status) => status != StatusCancelado;
+
+    public Task<ResultadoPedido> CriarAsync(DadosPedido dados)
     {
-        if (itens.Count == 0)
+        return EmTransacaoAsync(async () =>
         {
-            return new ResultadoPedido { Erro = "O pedido precisa ter ao menos um item." };
-        }
+            var erro = await ValidarCabecalhoAsync(dados);
+            if (erro != null) return Falha(erro);
 
-        if (!await _context.Clientes.AnyAsync(c => c.IdCliente == idCliente))
-        {
-            return new ResultadoPedido { Erro = "Cliente nao encontrado." };
-        }
-
-        var strategy = _context.Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
-        {
-            await using var transacao = await _context.Database.BeginTransactionAsync();
-
-            var pedido = new Pedido
-            {
-                IdCliente = idCliente,
-                DataPedido = DateTime.Now,
-                TiposVenda = tipoVenda,
-                Status = "Em separação"
-            };
-
-            foreach (var entrada in itens)
-            {
-                var produto = await _context.Produtos.FindAsync(entrada.IdProduto);
-                if (produto == null)
-                {
-                    return new ResultadoPedido { Erro = $"Produto {entrada.IdProduto} nao encontrado." };
-                }
-
-                if (entrada.Quantidade <= 0)
-                {
-                    return new ResultadoPedido { Erro = $"Quantidade invalida para {produto.Nome}." };
-                }
-
-                if (produto.Estoque < entrada.Quantidade)
-                {
-                    return new ResultadoPedido { Erro = $"Estoque insuficiente para {produto.Nome} (disponivel: {produto.Estoque})." };
-                }
-
-                var precoUnitario = CalcularPrecoUnitario(produto.Preco, tipoVenda);
-                pedido.Itens.Add(new ItemPedido
-                {
-                    IdProduto = produto.IdProduto,
-                    Quantidade = entrada.Quantidade,
-                    PrecoUnitario = precoUnitario,
-                    Desconto = entrada.Desconto
-                });
-                pedido.ValorTotal += (precoUnitario * entrada.Quantidade) - entrada.Desconto;
-
-                produto.Estoque -= entrada.Quantidade;
-                _context.MovimentacoesEstoque.Add(new MovimentacaoEstoque
-                {
-                    IdProduto = produto.IdProduto,
-                    Tipo = "Saida",
-                    Quantidade = entrada.Quantidade,
-                    Data = DateTime.Now,
-                    Observacao = "Pedido criado pelo app"
-                });
-            }
-
-            if (pedido.ValorTotal < 0)
-            {
-                return new ResultadoPedido { Erro = "O desconto nao pode ser maior que o valor do pedido." };
-            }
+            var pedido = new Pedido();
+            erro = await AplicarDadosAsync(pedido, dados, "Pedido criado");
+            if (erro != null) return Falha(erro);
 
             _context.Pedidos.Add(pedido);
             await _context.SaveChangesAsync();
-            await transacao.CommitAsync();
-
             return new ResultadoPedido { Pedido = pedido };
         });
     }
 
-    public async Task<ResultadoPedido> CancelarAsync(int idPedido)
+    public Task<ResultadoPedido> AtualizarAsync(int idPedido, DadosPedido dados)
     {
-        var pedido = await _context.Pedidos
-            .Include(p => p.Itens)
-            .ThenInclude(i => i.Produto)
-            .FirstOrDefaultAsync(p => p.IdPedido == idPedido);
-
-        if (pedido == null)
+        return EmTransacaoAsync(async () =>
         {
-            return new ResultadoPedido { Erro = "Pedido nao encontrado." };
+            var pedido = await CarregarAsync(idPedido);
+            if (pedido == null) return NaoEncontrado();
+
+            var erro = await ValidarCabecalhoAsync(dados);
+            if (erro != null) return Falha(erro);
+
+            DevolverEstoque(pedido, $"Ajuste do pedido #{pedido.IdPedido}");
+            _context.ItensPedido.RemoveRange(pedido.Itens);
+            pedido.Itens.Clear();
+
+            erro = await AplicarDadosAsync(pedido, dados, $"Pedido #{pedido.IdPedido} atualizado");
+            if (erro != null) return Falha(erro);
+
+            await _context.SaveChangesAsync();
+            return new ResultadoPedido { Pedido = pedido };
+        });
+    }
+
+    public Task<ResultadoPedido> CancelarAsync(int idPedido)
+    {
+        return EmTransacaoAsync(async () =>
+        {
+            var pedido = await CarregarAsync(idPedido);
+            if (pedido == null) return NaoEncontrado();
+            if (pedido.Status == StatusCancelado) return Falha("O pedido ja esta cancelado.");
+
+            DevolverEstoque(pedido, $"Cancelamento do pedido #{pedido.IdPedido}");
+            pedido.Status = StatusCancelado;
+
+            await _context.SaveChangesAsync();
+            return new ResultadoPedido { Pedido = pedido };
+        });
+    }
+
+    public Task<ResultadoPedido> ExcluirAsync(int idPedido)
+    {
+        return EmTransacaoAsync(async () =>
+        {
+            var pedido = await CarregarAsync(idPedido);
+            if (pedido == null) return NaoEncontrado();
+
+            DevolverEstoque(pedido, $"Exclusao do pedido #{pedido.IdPedido}");
+            _context.Pedidos.Remove(pedido);
+
+            await _context.SaveChangesAsync();
+            return new ResultadoPedido { Pedido = pedido };
+        });
+    }
+
+    private Task<Pedido?> CarregarAsync(int idPedido) => _context.Pedidos
+        .Include(p => p.Itens)
+        .ThenInclude(i => i.Produto)
+        .FirstOrDefaultAsync(p => p.IdPedido == idPedido);
+
+    private async Task<string?> ValidarCabecalhoAsync(DadosPedido dados)
+    {
+        if (dados.Itens.Count == 0) return "O pedido precisa ter ao menos um item.";
+        if (!StatusValidos.Contains(dados.Status)) return "Status de pedido invalido.";
+        if (dados.TiposVenda != "Varejo" && dados.TiposVenda != "Atacado") return "Tipo de venda invalido.";
+        if (!await _context.Clientes.AnyAsync(c => c.IdCliente == dados.IdCliente)) return "Cliente nao encontrado.";
+        return null;
+    }
+
+    // Preenche o pedido com os itens informados, calculando precos e baixando o estoque.
+    private async Task<string?> AplicarDadosAsync(Pedido pedido, DadosPedido dados, string observacao)
+    {
+        pedido.IdCliente = dados.IdCliente;
+        pedido.DataPedido = dados.DataPedido;
+        pedido.TiposVenda = dados.TiposVenda;
+        pedido.Status = dados.Status;
+        pedido.ValorTotal = 0m;
+
+        foreach (var entrada in dados.Itens)
+        {
+            var produto = await _context.Produtos.FindAsync(entrada.IdProduto);
+            if (produto == null) return $"Produto {entrada.IdProduto} nao encontrado.";
+            if (entrada.Quantidade <= 0) return $"Quantidade invalida para {produto.Nome}.";
+            if (entrada.Desconto < 0) return $"Desconto invalido para {produto.Nome}.";
+
+            // A checagem e feita item a item sobre o estoque ja baixado,
+            // entao o mesmo produto repetido em duas linhas tambem e validado.
+            if (ConsomeEstoque(dados.Status) && produto.Estoque < entrada.Quantidade)
+            {
+                return $"Estoque insuficiente para {produto.Nome} (disponivel: {produto.Estoque}).";
+            }
+
+            var precoUnitario = CalcularPrecoUnitario(produto.Preco, dados.TiposVenda);
+            var subtotal = (precoUnitario * entrada.Quantidade) - entrada.Desconto;
+            if (subtotal < 0) return $"O desconto de {produto.Nome} e maior que o valor do item.";
+
+            pedido.Itens.Add(new ItemPedido
+            {
+                IdProduto = produto.IdProduto,
+                Produto = produto,
+                Quantidade = entrada.Quantidade,
+                PrecoUnitario = precoUnitario,
+                Desconto = entrada.Desconto
+            });
+            pedido.ValorTotal += subtotal;
+
+            if (ConsomeEstoque(dados.Status))
+            {
+                produto.Estoque -= entrada.Quantidade;
+                RegistrarMovimentacao(produto.IdProduto, "Saida", entrada.Quantidade, observacao);
+            }
         }
 
-        if (pedido.Status == "Cancelado")
-        {
-            return new ResultadoPedido { Erro = "O pedido ja esta cancelado." };
-        }
+        return null;
+    }
+
+    private void DevolverEstoque(Pedido pedido, string observacao)
+    {
+        if (!ConsomeEstoque(pedido.Status)) return;
 
         foreach (var item in pedido.Itens)
         {
             if (item.Produto == null) continue;
-
             item.Produto.Estoque += item.Quantidade;
-            _context.MovimentacoesEstoque.Add(new MovimentacaoEstoque
-            {
-                IdProduto = item.IdProduto,
-                Tipo = "Entrada",
-                Quantidade = item.Quantidade,
-                Data = DateTime.Now,
-                Observacao = $"Cancelamento do pedido #{pedido.IdPedido}"
-            });
+            RegistrarMovimentacao(item.IdProduto, "Entrada", item.Quantidade, observacao);
         }
+    }
 
-        pedido.Status = "Cancelado";
-        await _context.SaveChangesAsync();
+    private void RegistrarMovimentacao(int idProduto, string tipo, int quantidade, string observacao)
+    {
+        _context.MovimentacoesEstoque.Add(new MovimentacaoEstoque
+        {
+            IdProduto = idProduto,
+            Tipo = tipo,
+            Quantidade = quantidade,
+            Data = DateTime.Now,
+            Observacao = observacao
+        });
+    }
 
-        return new ResultadoPedido { Pedido = pedido };
+    private async Task<ResultadoPedido> EmTransacaoAsync(Func<Task<ResultadoPedido>> operacao)
+    {
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            await using var transacao = await _context.Database.BeginTransactionAsync();
+            var resultado = await operacao();
+            if (resultado.Sucesso)
+            {
+                await transacao.CommitAsync();
+            }
+
+            return resultado;
+        });
+    }
+
+    // Descarta as alteracoes em memoria (estoque baixado, itens removidos) para que
+    // a tela que vai exibir o erro nao mostre valores que nao foram gravados.
+    private ResultadoPedido Falha(string erro)
+    {
+        _context.ChangeTracker.Clear();
+        return new ResultadoPedido { Erro = erro };
+    }
+
+    private ResultadoPedido NaoEncontrado()
+    {
+        _context.ChangeTracker.Clear();
+        return new ResultadoPedido { Erro = "Pedido nao encontrado.", NaoEncontrado = true };
     }
 }

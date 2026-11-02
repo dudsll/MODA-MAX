@@ -28,6 +28,8 @@ public class AppDbContext : DbContext
 
     public DbSet<LogSistema> LogsSistema => Set<LogSistema>();
 
+    public DbSet<RecuperacaoSenha> RecuperacoesSenha => Set<RecuperacaoSenha>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -92,6 +94,16 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(m => m.IdProduto)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<RecuperacaoSenha>()
+            .HasOne(r => r.Usuario)
+            .WithMany()
+            .HasForeignKey(r => r.IdUsuario)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<RecuperacaoSenha>()
+            .HasIndex(r => r.TokenHash)
+            .IsUnique();
 
         modelBuilder.Entity<LogSistema>()
             .HasOne(l => l.Usuario)

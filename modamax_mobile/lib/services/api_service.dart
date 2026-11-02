@@ -78,6 +78,11 @@ class ApiService {
         (json) => Dashboard.fromJson(json as Map<String, dynamic>),
       );
 
+  Future<Dados<GraficosDashboard>> graficos() => _lerComCache(
+        '/api/dashboard/graficos',
+        (json) => GraficosDashboard.fromJson(json as Map<String, dynamic>),
+      );
+
   Future<Dados<List<Produto>>> produtos({String? busca}) => _lerComCache(
         _comBusca('/api/produtos', busca),
         (json) => (json as List).map((p) => Produto.fromJson(p as Map<String, dynamic>)).toList(),

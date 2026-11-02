@@ -1,4 +1,6 @@
+using System.Globalization;
 using System.Text;
+using Microsoft.AspNetCore.Localization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -16,8 +18,20 @@ builder.Logging.AddDebug();
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("Connection string 'DefaultConnection' nao configurada.");
 
+// Banco oficial: SQL Server. "Database:Provider=Sqlite" liga o modo local sem Docker,
+// usado em desenvolvimento rapido e nos testes automatizados (sem procedures/triggers).
+var usarSqlite = string.Equals(builder.Configuration["Database:Provider"], "Sqlite", StringComparison.OrdinalIgnoreCase);
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
+{
+    if (usarSqlite)
+    {
+        options.UseSqlite(connectionString);
+    }
+    else
+    {
+        options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure());
+    }
+});
 
 var dataProtectionKeysPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data", "DataProtectionKeys");
 Directory.CreateDirectory(dataProtectionKeysPath);
@@ -41,6 +55,20 @@ var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>()
 builder.Services.AddSingleton(jwtOptions);
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<PedidoService>();
+builder.Services.AddScoped<RecuperacaoSenhaService>();
+builder.Services.AddScoped<DashboardService>();
+
+// E-mail: SMTP se a secao "Smtp" estiver configurada; senao, so registra no log.
+var smtpOptions = builder.Configuration.GetSection("Smtp").Get<SmtpOptions>();
+if (!string.IsNullOrWhiteSpace(smtpOptions?.Host))
+{
+    builder.Services.AddSingleton(smtpOptions);
+    builder.Services.AddSingleton<IEmailService, SmtpEmailService>();
+}
+else
+{
+    builder.Services.AddSingleton<IEmailService, LogEmailService>();
+}
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -71,7 +99,7 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    DbInitializer.Initialize(context);
+    DbInitializer.Initialize(context, usarMigrations: !usarSqlite);
 }
 
 if (!app.Environment.IsDevelopment())
@@ -80,6 +108,16 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
     app.UseHttpsRedirection();
 }
+
+// Cultura fixa pt-BR: moeda em R$ e datas dd/MM/yyyy tambem em servidores Linux (Docker/Azure),
+// que nao tem cultura padrao configurada.
+var culturaPtBr = new CultureInfo("pt-BR");
+app.UseRequestLocalization(new RequestLocalizationOptions
+{
+    DefaultRequestCulture = new RequestCulture(culturaPtBr),
+    SupportedCultures = new[] { culturaPtBr },
+    SupportedUICultures = new[] { culturaPtBr }
+});
 
 app.UseStaticFiles();
 app.UseRouting();
@@ -99,3 +137,6 @@ app.MapControllerRoute(
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
 app.Run();
+
+// Permite que o projeto de testes suba a aplicacao com WebApplicationFactory<Program>.
+public partial class Program;

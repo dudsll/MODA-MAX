@@ -1,0 +1,178 @@
+@model modamax.web.ViewModels.PedidoFormViewModel
+@using System.Globalization
+@using Microsoft.AspNetCore.Html
+@{
+    var acao = Model.IdPedido.HasValue ? "Edit" : "Create";
+}
+
+@functions {
+    // Opcoes de produto com preco e estoque em data-attributes, usados no calculo do total estimado.
+    private IHtmlContent OpcoesProduto(int selecionado)
+    {
+        var builder = new HtmlContentBuilder();
+        foreach (var produto in Model.Produtos)
+        {
+            var preco = produto.Preco.ToString(CultureInfo.InvariantCulture);
+            var selected = produto.IdProduto == selecionado ? " selected" : string.Empty;
+            builder.AppendHtml($"<option value=\"{produto.IdProduto}\" data-preco=\"{preco}\" data-estoque=\"{produto.Estoque}\"{selected}>");
+            builder.Append($"{produto.Nome} - Tam. {produto.Tamanho} ({produto.Estoque} em estoque)");
+            builder.AppendHtml("</option>");
+        }
+
+        return builder;
+    }
+}
+
+<form asp-action="@acao" asp-route-id="@Model.IdPedido" class="content-card form-card" id="form-pedido">
+    <div asp-validation-summary="All" class="text-danger"></div>
+    <input type="hidden" asp-for="IdPedido" />
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <label asp-for="IdCliente" class="form-label"></label>
+            <select asp-for="IdCliente" class="form-select">
+                @foreach (var cliente in Model.Clientes)
+                {
+                    <option value="@cliente.IdCliente">@cliente.Nome</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="DataPedido" class="form-label"></label>
+            <input asp-for="DataPedido" type="date" class="form-control" />
+        </div>
+        <div class="col-md-6">
+            <label asp-for="TiposVenda" class="form-label"></label>
+            <select asp-for="TiposVenda" class="form-select" id="tipo-venda">
+                <option value="Varejo">Varejo</option>
+                <option value="Atacado">Atacado (10% de desconto)</option>
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Status" class="form-label"></label>
+            <select asp-for="Status" class="form-select">
+                <option>Finalizado</option>
+                <option>Em separação</option>
+                <option>Cancelado</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="section-heading mt-4">
+        <div>
+            <p class="section-kicker">Itens</p>
+            <h2>Produtos do pedido</h2>
+        </div>
+        <button type="button" class="btn btn-outline-primary" id="adicionar-item">+ Adicionar produto</button>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-modern align-middle">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th style="width: 120px">Qtd</th>
+                    <th style="width: 140px">Desconto (R$)</th>
+                    <th style="width: 140px" class="text-end">Subtotal</th>
+                    <th style="width: 60px"><span class="visually-hidden">Remover</span></th>
+                </tr>
+            </thead>
+            <tbody id="itens-pedido">
+                @for (var i = 0; i < Model.Itens.Count; i++)
+                {
+                    var item = Model.Itens[i];
+                    <tr class="item-pedido">
+                        <td>
+                            <select name="Itens[@i].IdProduto" class="form-select campo-produto" aria-label="Produto">@OpcoesProduto(item.IdProduto)</select>
+                        </td>
+                        <td><input name="Itens[@i].Quantidade" type="number" min="1" value="@item.Quantidade" class="form-control campo-quantidade" aria-label="Quantidade" /></td>
+                        <td><input name="Itens[@i].Desconto" type="text" inputmode="decimal" value="@item.Desconto.ToString("0.##")" class="form-control campo-desconto" aria-label="Desconto" /></td>
+                        <td class="text-end campo-subtotal">-</td>
+                        <td><button type="button" class="btn btn-sm btn-outline-danger remover-item" aria-label="Remover produto">&times;</button></td>
+                    </tr>
+                }
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="3" class="text-end">Total estimado</th>
+                    <th class="text-end" id="total-pedido">-</th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <p class="text-muted small">O total final é calculado pelo sistema ao salvar, com o preço atual dos produtos.</p>
+
+    <template id="modelo-item">
+        <tr class="item-pedido">
+            <td><select class="form-select campo-produto" data-campo="IdProduto" aria-label="Produto">@OpcoesProduto(0)</select></td>
+            <td><input type="number" min="1" value="1" class="form-control campo-quantidade" data-campo="Quantidade" aria-label="Quantidade" /></td>
+            <td><input type="text" inputmode="decimal" value="0" class="form-control campo-desconto" data-campo="Desconto" aria-label="Desconto" /></td>
+            <td class="text-end campo-subtotal">-</td>
+            <td><button type="button" class="btn btn-sm btn-outline-danger remover-item" aria-label="Remover produto">&times;</button></td>
+        </tr>
+    </template>
+
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">@(Model.IdPedido.HasValue ? "Salvar alterações" : "Salvar pedido")</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancelar</a>
+    </div>
+</form>
+
+<script>
+    (function () {
+        const corpo = document.getElementById('itens-pedido');
+        const modelo = document.getElementById('modelo-item');
+        const tipoVenda = document.getElementById('tipo-venda');
+        const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        // Mantem os nomes Itens[0].Campo, Itens[1].Campo... em sequencia para o model binding.
+        function reindexar() {
+            corpo.querySelectorAll('tr.item-pedido').forEach((linha, i) => {
+                linha.querySelector('.campo-produto').name = `Itens[${i}].IdProduto`;
+                linha.querySelector('.campo-quantidade').name = `Itens[${i}].Quantidade`;
+                linha.querySelector('.campo-desconto').name = `Itens[${i}].Desconto`;
+            });
+            const unica = corpo.querySelectorAll('tr.item-pedido').length === 1;
+            corpo.querySelectorAll('.remover-item').forEach(b => b.disabled = unica);
+        }
+
+        function recalcular() {
+            const fator = tipoVenda.value === 'Atacado' ? 0.9 : 1;
+            let total = 0;
+            corpo.querySelectorAll('tr.item-pedido').forEach(linha => {
+                const opcao = linha.querySelector('.campo-produto').selectedOptions[0];
+                const preco = opcao ? Math.round(parseFloat(opcao.dataset.preco) * fator * 100) / 100 : 0;
+                const qtd = parseInt(linha.querySelector('.campo-quantidade').value, 10) || 0;
+                // Desconto no formato brasileiro (1.234,56), igual ao que o servidor espera.
+                const textoDesconto = linha.querySelector('.campo-desconto').value.replace(/\./g, '').replace(',', '.');
+                const desconto = parseFloat(textoDesconto) || 0;
+                const subtotal = preco * qtd - desconto;
+                linha.querySelector('.campo-subtotal').textContent = moeda.format(subtotal);
+                total += subtotal;
+            });
+            document.getElementById('total-pedido').textContent = moeda.format(total);
+        }
+
+        document.getElementById('adicionar-item').addEventListener('click', () => {
+            corpo.appendChild(modelo.content.cloneNode(true));
+            reindexar();
+            recalcular();
+            corpo.lastElementChild.querySelector('.campo-produto').focus();
+        });
+
+        corpo.addEventListener('click', e => {
+            if (!e.target.classList.contains('remover-item')) return;
+            e.target.closest('tr').remove();
+            reindexar();
+            recalcular();
+        });
+
+        corpo.addEventListener('input', recalcular);
+        corpo.addEventListener('change', recalcular);
+        tipoVenda.addEventListener('change', recalcular);
+
+        reindexar();
+        recalcular();
+    })();
+</script>

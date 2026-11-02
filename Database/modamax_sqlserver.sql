@@ -245,3 +245,25 @@ INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
 VALUES (N'20261030025750_ProceduresETriggers', N'10.0.14');
 GO
 
+BEGIN TRANSACTION;
+CREATE TABLE [RecuperacaoSenha] (
+    [IdRecuperacao] int NOT NULL IDENTITY,
+    [IdUsuario] int NOT NULL,
+    [TokenHash] nvarchar(64) NOT NULL,
+    [CriadoEm] datetime2 NOT NULL,
+    [ExpiraEm] datetime2 NOT NULL,
+    [UsadoEm] datetime2 NULL,
+    CONSTRAINT [PK_RecuperacaoSenha] PRIMARY KEY ([IdRecuperacao]),
+    CONSTRAINT [FK_RecuperacaoSenha_Usuario_IdUsuario] FOREIGN KEY ([IdUsuario]) REFERENCES [Usuario] ([IdUsuario]) ON DELETE CASCADE
+);
+
+CREATE INDEX [IX_RecuperacaoSenha_IdUsuario] ON [RecuperacaoSenha] ([IdUsuario]);
+
+CREATE UNIQUE INDEX [IX_RecuperacaoSenha_TokenHash] ON [RecuperacaoSenha] ([TokenHash]);
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20261031213905_RecuperacaoSenha', N'10.0.14');
+
+COMMIT;
+GO
+

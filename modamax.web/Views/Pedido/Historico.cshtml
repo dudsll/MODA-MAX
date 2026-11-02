@@ -18,11 +18,11 @@
         </div>
         <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Filtrar</button></div>
     </form>
-    <div class="table-responsive"><table class="table table-modern"><thead><tr><th>Pedido</th><th>Cliente</th><th>Produto</th><th>Data</th><th>Status</th><th>Valor</th></tr></thead><tbody>
+    <div class="table-responsive"><table class="table table-modern"><thead><tr><th>Pedido</th><th>Cliente</th><th>Produtos</th><th>Data</th><th>Status</th><th>Valor</th></tr></thead><tbody>
     @foreach (var pedido in Model)
     {
-        var item = pedido.Itens.FirstOrDefault();
-        <tr><td>#@pedido.IdPedido</td><td>@pedido.Cliente?.Nome</td><td>@item?.Produto?.Nome</td><td>@pedido.DataPedido.ToString("dd/MM/yyyy")</td><td>@pedido.Status</td><td>@pedido.ValorTotal.ToString("C")</td></tr>
+        var produtos = string.Join(", ", pedido.Itens.Select(i => $"{i.Produto?.Nome} ({i.Quantidade})"));
+        <tr><td><a asp-action="Details" asp-route-id="@pedido.IdPedido">#@pedido.IdPedido</a></td><td>@pedido.Cliente?.Nome</td><td>@produtos</td><td>@pedido.DataPedido.ToString("dd/MM/yyyy")</td><td>@pedido.Status</td><td>@pedido.ValorTotal.ToString("C")</td></tr>
     }
     </tbody></table></div>
 </div>

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
 using modamax.web.Dtos;
+using modamax.web.Services;
 
 namespace modamax.web.Controllers.Api;
 
@@ -13,10 +14,12 @@ namespace modamax.web.Controllers.Api;
 public class GestaoApiController : ControllerBase
 {
     private readonly AppDbContext _context;
+    private readonly DashboardService _dashboardService;
 
-    public GestaoApiController(AppDbContext context)
+    public GestaoApiController(AppDbContext context, DashboardService dashboardService)
     {
         _context = context;
+        _dashboardService = dashboardService;
     }
 
     // GET /api/categorias
@@ -38,8 +41,15 @@ public class GestaoApiController : ControllerBase
             await _context.Produtos.CountAsync(),
             await _context.Clientes.CountAsync(),
             await _context.Pedidos.CountAsync(),
-            await _context.Pedidos.Where(p => p.Status != "Cancelado").SumAsync(p => (decimal?)p.ValorTotal) ?? 0m,
+            (await _context.Pedidos.Where(p => p.Status != "Cancelado").Select(p => p.ValorTotal).ToListAsync()).Sum(),
             await _context.Produtos.CountAsync(p => p.Estoque <= 15));
+    }
+
+    // GET /api/dashboard/graficos  (mesmos dados dos graficos do painel Web)
+    [HttpGet("dashboard/graficos")]
+    public async Task<ActionResult<GraficosDashboard>> Graficos()
+    {
+        return await _dashboardService.GerarGraficosAsync();
     }
 
     // GET /api/relatorios/vendas?dataInicial=2026-06-01&dataFinal=2026-06-30  (procedure sp_RelatorioVendasPeriodo)
