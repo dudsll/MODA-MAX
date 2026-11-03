@@ -23,7 +23,9 @@ public record ProdutoDto(
     int IdCategoria,
     string? Categoria,
     int IdFornecedor,
-    string? Fornecedor);
+    string? Fornecedor,
+    string? CodigoBarras,
+    string? FotoUrl);
 
 public class ProdutoSalvarDto
 {
@@ -48,11 +50,14 @@ public class ProdutoSalvarDto
     public int IdCategoria { get; set; }
 
     public int IdFornecedor { get; set; }
+
+    [StringLength(14)]
+    public string? CodigoBarras { get; set; }
 }
 
 public class EntradaEstoqueDto
 {
-    [Range(1, int.MaxValue)]
+    [Range(1, int.MaxValue, ErrorMessage = "A quantidade de entrada deve ser maior que zero.")]
     public int Quantidade { get; set; }
 
     [StringLength(200)]
@@ -102,7 +107,7 @@ public class PedidoCriarDto
     [RegularExpression("Varejo|Atacado")]
     public string TiposVenda { get; set; } = "Varejo";
 
-    [MinLength(1)]
+    [MinLength(1, ErrorMessage = "O pedido precisa ter ao menos um item.")]
     public List<PedidoItemCriarDto> Itens { get; set; } = new();
 }
 
@@ -110,10 +115,10 @@ public class PedidoItemCriarDto
 {
     public int IdProduto { get; set; }
 
-    [Range(1, int.MaxValue)]
+    [Range(1, int.MaxValue, ErrorMessage = "A quantidade deve ser maior que zero.")]
     public int Quantidade { get; set; }
 
-    [Range(0, 999999)]
+    [Range(0, 999999, ErrorMessage = "O desconto não pode ser negativo.")]
     public decimal Desconto { get; set; }
 }
 

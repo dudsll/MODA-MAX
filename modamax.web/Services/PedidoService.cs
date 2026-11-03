@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using ModaMax.Web.Data;
 using modamax.web.Models;
 
@@ -49,10 +50,12 @@ public class PedidoService
     public static readonly string[] StatusValidos = { StatusFinalizado, StatusEmSeparacao, StatusCancelado };
 
     private readonly AppDbContext _context;
+    private readonly ILogger<PedidoService> _logger;
 
-    public PedidoService(AppDbContext context)
+    public PedidoService(AppDbContext context, ILogger<PedidoService>? logger = null)
     {
         _context = context;
+        _logger = logger ?? NullLogger<PedidoService>.Instance;
     }
 
     public static decimal CalcularPrecoUnitario(decimal precoBase, string tipoVenda)
@@ -78,6 +81,8 @@ public class PedidoService
 
             _context.Pedidos.Add(pedido);
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Pedido {IdPedido} criado: {TipoVenda}, {QuantidadeItens} item(ns), total {ValorTotal}",
+                pedido.IdPedido, pedido.TiposVenda, pedido.Itens.Count, pedido.ValorTotal);
             return new ResultadoPedido { Pedido = pedido };
         });
     }
@@ -116,6 +121,7 @@ public class PedidoService
             pedido.Status = StatusCancelado;
 
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Pedido {IdPedido} cancelado; estoque devolvido", pedido.IdPedido);
             return new ResultadoPedido { Pedido = pedido };
         });
     }
@@ -131,6 +137,7 @@ public class PedidoService
             _context.Pedidos.Remove(pedido);
 
             await _context.SaveChangesAsync();
+            _logger.LogInformation("Pedido {IdPedido} excluido; estoque devolvido", pedido.IdPedido);
             return new ResultadoPedido { Pedido = pedido };
         });
     }
@@ -240,6 +247,7 @@ public class PedidoService
     // a tela que vai exibir o erro nao mostre valores que nao foram gravados.
     private ResultadoPedido Falha(string erro)
     {
+        _logger.LogWarning("Operacao de pedido recusada: {Motivo}", erro);
         _context.ChangeTracker.Clear();
         return new ResultadoPedido { Erro = erro };
     }

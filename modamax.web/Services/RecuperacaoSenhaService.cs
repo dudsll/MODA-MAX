@@ -58,6 +58,9 @@ public class RecuperacaoSenhaService
         if (recuperacao?.Usuario == null) return null;
 
         recuperacao.Usuario.Senha = SenhaService.GerarHash(recuperacao.Usuario, novaSenha);
+        // Quem provou ser o dono da conta pelo e-mail nao precisa esperar o fim do bloqueio.
+        recuperacao.Usuario.TentativasFalhas = 0;
+        recuperacao.Usuario.BloqueadoAte = null;
         recuperacao.UsadoEm = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 

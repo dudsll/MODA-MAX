@@ -112,6 +112,20 @@ class ApiService {
 
   Future<void> cancelarPedido(int id) => _enviar('PUT', '/api/pedidos/$id/cancelar');
 
+  /// Busca o produto pelo codigo de barras lido na camera (sem cache: o estoque precisa ser o atual).
+  Future<Produto> produtoPorCodigo(String codigo) async => Produto.fromJson(
+      await _enviar('GET', '/api/produtos/codigo/${Uri.encodeComponent(codigo)}') as Map<String, dynamic>);
+
+  /// Registra entrada de mercadoria e devolve o novo estoque (somente Estrategico e Tatico).
+  Future<int> entradaEstoque(int idProduto, int quantidade, {String? observacao}) async {
+    final json = await _enviar('POST', '/api/produtos/$idProduto/entrada-estoque',
+        corpo: {'quantidade': quantidade, 'observacao': observacao});
+    return (json as Map<String, dynamic>)['estoque'] as int;
+  }
+
+  /// Gerentes e diretoria podem dar entrada no estoque e cancelar pedidos.
+  bool get podeGerenciarEstoque => usuario != null && usuario!.nivel != 'Operacional';
+
   Future<Cliente> salvarCliente(Map<String, dynamic> corpo, {int? id}) async {
     if (id == null) {
       return Cliente.fromJson(await _enviar('POST', '/api/clientes', corpo: corpo) as Map<String, dynamic>);
@@ -179,7 +193,9 @@ class ApiService {
 
   String _mensagemDeErro(http.Response resposta) {
     try {
+      // A API responde erros no padrao Problem Details: a mensagem para o usuario vem em "detail".
       final json = jsonDecode(utf8.decode(resposta.bodyBytes));
+      if (json is Map && json['detail'] != null) return json['detail'] as String;
       if (json is Map && json['mensagem'] != null) return json['mensagem'] as String;
       if (json is Map && json['title'] != null) return json['title'] as String;
     } catch (_) {}

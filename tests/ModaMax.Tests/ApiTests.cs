@@ -13,9 +13,21 @@ public sealed class ModaMaxFactory : WebApplicationFactory<Program>
 {
     private readonly string _banco = $"Data Source=testes-{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
     private readonly SqliteConnection _conexaoAberta;
+    private readonly int _limiteRequisicoes;
 
-    public ModaMaxFactory()
+    public string PastaFotos { get; } = Path.Combine(Path.GetTempPath(), $"modamax-testes-fotos-{Guid.NewGuid():N}");
+
+    // Os testes fazem muitos logins seguidos; o limite por IP so e baixo no teste que o verifica.
+    // (O xUnit exige um unico construtor publico nas fixtures.)
+    public ModaMaxFactory() : this(limiteRequisicoes: 1000)
     {
+    }
+
+    public static ModaMaxFactory ComLimiteDeRequisicoes(int limite) => new(limite);
+
+    private ModaMaxFactory(int limiteRequisicoes)
+    {
+        _limiteRequisicoes = limiteRequisicoes;
         // Mantem o banco em memoria vivo enquanto a fabrica existir.
         _conexaoAberta = new SqliteConnection(_banco);
         _conexaoAberta.Open();
@@ -27,12 +39,16 @@ public sealed class ModaMaxFactory : WebApplicationFactory<Program>
         builder.UseSetting("Database:Provider", "Sqlite");
         builder.UseSetting("ConnectionStrings:DefaultConnection", _banco);
         builder.UseSetting("Jwt:Key", "chave-de-teste-com-mais-de-32-caracteres-modamax");
+        builder.UseSetting("Seguranca:LimiteRequisicoesPorMinuto", _limiteRequisicoes.ToString());
+        builder.UseSetting("Fotos:Pasta", PastaFotos);
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
-        if (disposing) _conexaoAberta.Dispose();
+        if (!disposing) return;
+        _conexaoAberta.Dispose();
+        if (Directory.Exists(PastaFotos)) Directory.Delete(PastaFotos, recursive: true);
     }
 }
 
@@ -107,8 +123,74 @@ public class ApiTests : IClassFixture<ModaMaxFactory>
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+        Assert.Equal("application/problem+json", resposta.Content.Headers.ContentType?.MediaType);
         var corpo = await resposta.Content.ReadFromJsonAsync<JsonElement>(Json);
-        Assert.Contains("Estoque insuficiente", corpo.GetProperty("mensagem").GetString());
+        Assert.Contains("Estoque insuficiente", corpo.GetProperty("detail").GetString());
+        Assert.Equal(400, corpo.GetProperty("status").GetInt32());
+    }
+
+    [Fact]
+    public async Task Erros_da_api_seguem_o_padrao_problem_details()
+    {
+        var semToken = await _factory.CreateClient().GetAsync("/api/produtos");
+        Assert.Equal("application/problem+json", semToken.Content.Headers.ContentType?.MediaType);
+
+        var cliente = await ClienteLogadoAsync("tatico@modamax.com");
+        var inexistente = await cliente.GetAsync("/api/produtos/999999");
+        Assert.Equal(HttpStatusCode.NotFound, inexistente.StatusCode);
+        var corpo = await inexistente.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal("Recurso nao encontrado.", corpo.GetProperty("title").GetString());
+        Assert.True(corpo.TryGetProperty("traceId", out _));
+    }
+
+    [Fact]
+    public async Task Validacao_da_api_explica_o_erro_em_portugues()
+    {
+        var cliente = await ClienteLogadoAsync("operacional@modamax.com");
+        var resposta = await cliente.PostAsJsonAsync("/api/pedidos", new { idCliente = 1, tiposVenda = "Varejo", itens = Array.Empty<object>() });
+
+        Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+        var corpo = await resposta.Content.ReadFromJsonAsync<JsonElement>(Json);
+        Assert.Equal("Dados invalidos.", corpo.GetProperty("title").GetString());
+        Assert.Equal("O pedido precisa ter ao menos um item.", corpo.GetProperty("detail").GetString());
+    }
+
+    [Fact]
+    public async Task Produto_e_encontrado_pelo_codigo_de_barras()
+    {
+        var cliente = await ClienteLogadoAsync("operacional@modamax.com");
+
+        var produto = await cliente.GetFromJsonAsync<JsonElement>("/api/produtos/codigo/7891234500014", Json);
+        Assert.Equal("Macaquinho Jeans", produto.GetProperty("nome").GetString());
+
+        var desconhecido = await cliente.GetAsync("/api/produtos/codigo/4006381333931");
+        Assert.Equal(HttpStatusCode.NotFound, desconhecido.StatusCode);
+
+        var invalido = await cliente.GetAsync("/api/produtos/codigo/4006381333932");
+        Assert.Equal(HttpStatusCode.BadRequest, invalido.StatusCode);
+    }
+
+    [Fact]
+    public async Task Foto_enviada_pela_api_fica_disponivel_no_endereco_devolvido()
+    {
+        var png = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0x0D, 1, 2, 3 };
+        MultipartFormDataContent Formulario()
+        {
+            var conteudo = new ByteArrayContent(png);
+            conteudo.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+            return new MultipartFormDataContent { { conteudo, "foto", "camisa.png" } };
+        }
+
+        var operacional = await ClienteLogadoAsync("operacional@modamax.com");
+        Assert.Equal(HttpStatusCode.Forbidden, (await operacional.PostAsync("/api/produtos/2/foto", Formulario())).StatusCode);
+
+        var tatico = await ClienteLogadoAsync("tatico@modamax.com");
+        var resposta = await tatico.PostAsync("/api/produtos/2/foto", Formulario());
+        resposta.EnsureSuccessStatusCode();
+        var fotoUrl = (await resposta.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("fotoUrl").GetString();
+
+        Assert.StartsWith("/uploads/produtos/", fotoUrl);
+        Assert.Equal(png, await _factory.CreateClient().GetByteArrayAsync(fotoUrl));
     }
 
     [Fact]

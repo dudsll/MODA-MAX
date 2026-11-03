@@ -116,6 +116,8 @@ public static class DbInitializer
             produtos[i].Categoria = categorias[categoriaDoProduto[i]];
             produtos[i].Fornecedor = fornecedores[produtos[i].IdFornecedor - 1];
             produtos[i].IdFornecedor = 0;
+            // EAN-13 de demonstracao: prefixo 789 (Brasil) + empresa ficticia + item + digito verificador.
+            produtos[i].CodigoBarras = CodigoBarras.Gerar($"789123450{i + 1:000}");
         }
 
         var produtoDoPedido = new[] { 4, 5, 9, 8, 7 };

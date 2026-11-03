@@ -15,13 +15,20 @@
     </div>
 </div>
 
-<div class="content-card details-card">
+<div class="content-card details-card @(string.IsNullOrEmpty(Model.FotoUrl) ? "" : "produto-detalhes")">
+    @if (!string.IsNullOrEmpty(Model.FotoUrl))
+    {
+        <img class="produto-foto" src="@Model.FotoUrl" alt="Foto de @Model.Nome" />
+    }
     <dl class="row mb-0">
         <dt class="col-sm-3">Código</dt>
         <dd class="col-sm-9">@Model.IdProduto</dd>
 
+        <dt class="col-sm-3">Código de barras</dt>
+        <dd class="col-sm-9">@(Model.CodigoBarras ?? "Não informado")</dd>
+
         <dt class="col-sm-3">Descrição</dt>
-        <dd class="col-sm-9">@Model.Descricao</dd>
+        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Descricao) ? "Não informada" : Model.Descricao)</dd>
 
         <dt class="col-sm-3">Tamanho</dt>
         <dd class="col-sm-9">@Model.Tamanho</dd>

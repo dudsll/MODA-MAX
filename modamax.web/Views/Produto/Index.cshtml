@@ -17,7 +17,7 @@
     <form method="get" class="row g-3 mb-4">
         <div class="col-md-4">
             <label class="form-label">Busca</label>
-            <input type="text" name="busca" value="@ViewBag.Busca" class="form-control" placeholder="Nome ou codigo" />
+            <input type="text" name="busca" value="@ViewBag.Busca" class="form-control" placeholder="Nome, código ou código de barras" />
         </div>
         <div class="col-md-3">
             <label class="form-label">Categoria</label>
@@ -59,7 +59,19 @@
             {
                 <tr>
                     <td>@item.IdProduto</td>
-                    <td>@item.Nome</td>
+                    <td>
+                        <div class="produto-nome">
+                            @if (!string.IsNullOrEmpty(item.FotoUrl))
+                            {
+                                <img class="produto-foto-mini" src="@item.FotoUrl" alt="" loading="lazy" />
+                            }
+                            else
+                            {
+                                <span class="produto-foto-mini produto-sem-foto" aria-hidden="true">@item.Nome[..1]</span>
+                            }
+                            <span>@item.Nome</span>
+                        </div>
+                    </td>
                     <td>@item.Categoria?.Nome</td>
                     <td>@item.Fornecedor?.Nome</td>
                     <td>@item.Preco.ToString("C")</td>

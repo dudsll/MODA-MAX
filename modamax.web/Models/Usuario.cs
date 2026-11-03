@@ -27,5 +27,10 @@ public class Usuario
     [StringLength(30)]
     public string Nivel { get; set; } = "Operacional";
 
+    // Protecao contra tentativa de senhas: apos varias falhas seguidas a conta fica bloqueada por um tempo.
+    public int TentativasFalhas { get; set; }
+
+    public DateTime? BloqueadoAte { get; set; }
+
     public ICollection<LogSistema> Logs { get; set; } = new List<LogSistema>();
 }

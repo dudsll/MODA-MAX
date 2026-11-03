@@ -29,6 +29,10 @@ services:
       Jwt__Key: ${JWT_KEY:-chave-de-desenvolvimento-modamax-trocar-em-producao-123456}
     ports:
       - "8080:8080"
+    volumes:
+      # Fotos dos produtos enviadas pela Web/API (sobrevivem a recriacao do container).
+      - fotos-produtos:/app/wwwroot/uploads
 
 volumes:
   sqlserver-data:
+  fotos-produtos:

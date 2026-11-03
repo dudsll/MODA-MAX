@@ -56,6 +56,11 @@ public class AppDbContext : DbContext
             .HasIndex(u => u.Email)
             .IsUnique();
 
+        // Unico apenas entre os produtos que tem codigo (no SQL Server vira indice filtrado IS NOT NULL).
+        modelBuilder.Entity<Produto>()
+            .HasIndex(p => p.CodigoBarras)
+            .IsUnique();
+
         modelBuilder.Entity<Pedido>()
             .HasIndex(p => p.DataPedido);
 

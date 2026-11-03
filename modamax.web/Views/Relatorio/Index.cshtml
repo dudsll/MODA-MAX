@@ -1,14 +1,68 @@
 @model modamax.web.ViewModels.RelatorioViewModel
-@{ ViewData["Title"] = "Relatórios"; }
-<div class="page-header"><div><p class="section-kicker">Análises</p><h1>Relatórios</h1><p class="page-copy">Produtos mais vendidos e vendas por período.</p></div></div>
-<div class="content-card">
-    <form method="get" class="row g-3 mb-4">
-        <div class="col-md-3"><label class="form-label">Data inicial</label><input type="date" name="dataInicial" value="@(Model.DataInicial?.ToString("yyyy-MM-dd"))" class="form-control" /></div>
-        <div class="col-md-3"><label class="form-label">Data final</label><input type="date" name="dataFinal" value="@(Model.DataFinal?.ToString("yyyy-MM-dd"))" class="form-control" /></div>
+@{
+    ViewData["Title"] = "Relatórios";
+    var filtro = new Dictionary<string, string?>
+    {
+        ["dataInicial"] = Model.DataInicial?.ToString("yyyy-MM-dd"),
+        ["dataFinal"] = Model.DataFinal?.ToString("yyyy-MM-dd")
+    };
+}
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Análises</p>
+        <h1>Relatórios</h1>
+        <p class="page-copy">Produtos mais vendidos e vendas por dia. Pedidos cancelados não entram nos números.</p>
+    </div>
+    <div class="header-actions">
+        <a class="btn btn-outline-primary" asp-action="ExportarPdf" asp-all-route-data="filtro">Exportar PDF</a>
+        <a class="btn btn-primary" asp-action="ExportarExcel" asp-all-route-data="filtro">Exportar Excel</a>
+    </div>
+</div>
+
+<div class="content-card mb-4">
+    <form method="get" class="row g-3">
+        <div class="col-md-3"><label class="form-label" for="dataInicial">Data inicial</label><input id="dataInicial" type="date" name="dataInicial" value="@filtro["dataInicial"]" class="form-control" /></div>
+        <div class="col-md-3"><label class="form-label" for="dataFinal">Data final</label><input id="dataFinal" type="date" name="dataFinal" value="@filtro["dataFinal"]" class="form-control" /></div>
         <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Gerar</button></div>
+        <div class="col-md-4 d-flex align-items-end"><span class="text-muted">Período: @Model.DescricaoPeriodo</span></div>
     </form>
 </div>
+
+<section class="metrics-grid">
+    <article class="metric-card"><span class="metric-label">Pedidos</span><strong>@Model.TotalPedidos</strong></article>
+    <article class="metric-card"><span class="metric-label">Peças vendidas</span><strong>@Model.TotalItens</strong></article>
+    <article class="metric-card accent-card"><span class="metric-label">Faturamento</span><strong>@Model.Faturamento.ToString("C")</strong></article>
+    <article class="metric-card"><span class="metric-label">Ticket médio</span><strong>@Model.TicketMedio.ToString("C")</strong></article>
+</section>
+
 <div class="content-grid">
-    <article class="content-card"><h2>Produtos mais vendidos</h2><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Produto</th><th>Quantidade</th><th>Faturamento</th></tr></thead><tbody>@foreach (var item in Model.ProdutosMaisVendidos){<tr><td>@item.Produto</td><td>@item.QuantidadeVendida</td><td>@item.Faturamento.ToString("C")</td></tr>}</tbody></table></div></article>
-    <article class="content-card"><h2>Vendas por período</h2><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Período</th><th>Pedidos</th><th>Total</th></tr></thead><tbody>@foreach (var item in Model.VendasPorPeriodo){<tr><td>@item.Periodo</td><td>@item.Pedidos</td><td>@item.Total.ToString("C")</td></tr>}</tbody></table></div></article>
+    <article class="content-card">
+        <h2>Produtos mais vendidos</h2>
+        <div class="table-responsive">
+            <table class="table table-modern">
+                <thead><tr><th>Produto</th><th class="text-end">Quantidade</th><th class="text-end">Faturamento</th></tr></thead>
+                <tbody>
+                @foreach (var item in Model.ProdutosMaisVendidos)
+                {
+                    <tr><td>@item.Produto</td><td class="text-end">@item.QuantidadeVendida</td><td class="text-end">@item.Faturamento.ToString("C")</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </article>
+    <article class="content-card">
+        <h2>Vendas por dia</h2>
+        <div class="table-responsive">
+            <table class="table table-modern">
+                <thead><tr><th>Data</th><th class="text-end">Pedidos</th><th class="text-end">Peças</th><th class="text-end">Total</th></tr></thead>
+                <tbody>
+                @foreach (var item in Model.VendasPorPeriodo)
+                {
+                    <tr><td>@item.Periodo</td><td class="text-end">@item.Pedidos</td><td class="text-end">@item.Itens</td><td class="text-end">@item.Total.ToString("C")</td></tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    </article>
 </div>
