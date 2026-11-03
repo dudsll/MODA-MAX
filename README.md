@@ -9,14 +9,15 @@ O ModaMax Web foi criado para organizar processos básicos de uma operação com
 Principais recursos:
 
 - Dashboard com totais de produtos, clientes, pedidos, usuários, faturamento e alertas de estoque.
-- Gestão de produtos, categorias e fornecedores.
+- Gestão de produtos (com foto e código de barras EAN/GTIN), categorias e fornecedores.
 - Cadastro e manutenção de clientes.
 - Registro, edição, cancelamento e histórico de pedidos.
-- Controle de usuários por nível de acesso.
-- Relatórios por período.
-- Registro de logs de auditoria.
-- API REST com autenticação JWT consumida pelo aplicativo mobile.
-- App mobile com painel, consulta de produtos, cadastro de clientes e registro de pedidos (com modo offline).
+- Controle de usuários por nível de acesso, com bloqueio após tentativas de senha.
+- Relatórios por período, exportáveis em PDF e Excel.
+- Registro de logs de auditoria e logs estruturados da aplicação (Serilog).
+- Tradutor de LIBRAS (VLibras) em todas as páginas.
+- API REST com autenticação JWT e erros padronizados (Problem Details), consumida pelo aplicativo mobile.
+- App mobile com painel, consulta de produtos com foto, leitor de código de barras, entrada de estoque, cadastro de clientes e registro de pedidos (com modo offline).
 - Banco SQL Server com procedures, triggers e dados de demonstração criados automaticamente.
 
 ## Tecnologias utilizadas
@@ -25,9 +26,12 @@ Principais recursos:
 - ASP.NET Core Web API com autenticação JWT (API REST)
 - Entity Framework Core 10 + migrations
 - SQL Server 2022 (procedures, triggers e constraints)
-- Flutter (aplicativo mobile)
+- Flutter (aplicativo mobile) com `mobile_scanner` (leitor de código de barras)
+- ClosedXML (Excel) e QuestPDF (PDF, licença Community)
+- Serilog (logs estruturados)
+- xUnit e Testcontainers (testes, inclusive com SQL Server real)
 - Docker / Docker Compose e GitHub Actions (CI)
-- Bootstrap e jQuery
+- Bootstrap, jQuery, Chart.js e VLibras
 
 ## Arquitetura
 
@@ -42,7 +46,8 @@ Navegador ──sessão─> MVC (Controllers + Views) ────────�
 | ------ | ----- | ---------------- |
 | Apresentação Web | `Controllers/`, `Views/`, `ViewModels/` | Telas MVC e controle de acesso por sessão (`Filters/RequireUserAttribute`) |
 | API REST | `Controllers/Api/`, `Dtos/` | Endpoints JSON consumidos pelo app mobile |
-| Regras de negócio | `Services/` | Pedidos (estoque, atacado, transação), hash de senha, emissão de token |
+| Regras de negócio | `Services/` | Pedidos (estoque, atacado, transação), login com bloqueio, relatórios e exportação, fotos, código de barras, hash de senha, token |
+| Infraestrutura | `Infraestrutura/` | Limite de requisições por IP e erros padronizados da API |
 | Dados | `Models/`, `Data/`, `Migrations/` | Entidades, `AppDbContext`, seed e evolução do banco |
 | Mobile | `../modamax_mobile/` | App Flutter (login, painel, produtos, clientes, pedidos) |
 
@@ -56,12 +61,14 @@ modamax.web/
 ├── Database/
 │   └── modamax_sqlserver.sql    # script completo do banco (gerado das migrations)
 ├── modamax_mobile/              # aplicativo Flutter
-├── tests/ModaMax.Tests/         # testes automatizados (xUnit)
+├── tests/ModaMax.Tests/         # testes de regras e da API (xUnit + SQLite em memória)
+├── tests/ModaMax.IntegrationTests/  # testes com SQL Server real (Testcontainers)
 └── modamax.web/
     ├── Controllers/  (Api/ = API REST)
     ├── Data/
     ├── Dtos/
     ├── Filters/
+    ├── Infraestrutura/
     ├── Migrations/
     ├── Models/
     ├── Services/
@@ -115,7 +122,13 @@ Na primeira execução as migrations criam as tabelas, procedures e triggers, e 
 dotnet test tests/ModaMax.Tests
 ```
 
-São 29 testes: regras de pedido (estoque, atacado, edição, cancelamento), recuperação de senha (token de uso único, expiração, hash) e testes de integração da API e das páginas, com a aplicação rodando em memória.
+São 62 testes, com a aplicação rodando em memória (SQLite): regras de pedido, bloqueio de login e limite de requisições, recuperação de senha, código de barras, fotos, relatórios e exportações, e a API de ponta a ponta (permissões, Problem Details, busca por código, envio de foto).
+
+```bash
+dotnet test tests/ModaMax.IntegrationTests
+```
+
+São mais 10 testes que sobem um SQL Server 2022 de verdade com Testcontainers e verificam as procedures, os triggers, as restrições `CHECK`, o índice único do código de barras e as transações. Precisam do Docker; sem ele, aparecem como ignorados. No CI eles são obrigatórios (`MODAMAX_TESTES_SQLSERVER=1`).
 
 Para subir tudo em containers (banco + Web/API em `http://localhost:8080`):
 
@@ -134,6 +147,8 @@ flutter run
 
 `flutter create .` só gera as pastas `android/` e `ios/` (não sobrescreve `lib/`). Como a API local usa HTTP, no Android adicione `android:usesCleartextTraffic="true"` na tag `<application>` de `android/app/src/main/AndroidManifest.xml`.
 
+O leitor de código de barras usa a câmera. No Android a permissão já vem do pacote `mobile_scanner`; no iOS, adicione a chave `NSCameraUsageDescription` (ex.: "Ler o código de barras das etiquetas") em `ios/Runner/Info.plist`. No emulador, use o botão "Digitar o código".
+
 O app usa `http://10.0.2.2:5248` no emulador Android e `http://localhost:5248` no simulador iOS. Para apontar para outro servidor:
 
 ```bash
@@ -150,6 +165,8 @@ SQL Server, com a estrutura versionada por migrations do EF Core (`modamax.web/M
   - `sp_ProdutosEstoqueBaixo`: produtos abaixo do limite de estoque (`GET /api/produtos/estoque-baixo`).
   - `sp_RegistrarEntradaEstoque`: entrada de mercadoria com movimentação, em transação (`POST /api/produtos/{id}/entrada-estoque`).
   - `trg_Produto_AuditaPreco` e `trg_Pedido_AuditaStatus`: auditoria automática em `LogSistema`.
+- `RecuperacaoSenha`: tabela dos links de redefinição de senha.
+- `FotosCodigoBarrasBloqueioLogin`: código de barras (índice único filtrado) e foto do produto; tentativas e bloqueio no usuário.
 
 O script completo está em `Database/modamax_sqlserver.sql`. Para gerá-lo de novo:
 
@@ -159,7 +176,13 @@ dotnet ef migrations script --project modamax.web -o Database/modamax_sqlserver.
 
 ## API REST
 
-Todas as rotas (menos o login) exigem o cabeçalho `Authorization: Bearer <token>`.
+Todas as rotas (menos o login) exigem o cabeçalho `Authorization: Bearer <token>`. Os erros seguem o padrão Problem Details (RFC 9457), com a mensagem para o usuário no campo `detail`:
+
+```json
+{ "title": "Requisicao invalida.", "status": 400, "detail": "Estoque insuficiente para Saia Jeans (disponivel: 17).", "traceId": "00-..." }
+```
+
+Códigos usados: 400 (dados inválidos), 401 (sem login ou senha errada), 403 (nível sem permissão), 404 (não encontrado), 409 (conflito), 423 (conta bloqueada) e 429 (muitas tentativas).
 
 | Método | Rota | Descrição |
 | ------ | ---- | --------- |
@@ -168,6 +191,8 @@ Todas as rotas (menos o login) exigem o cabeçalho `Authorization: Bearer <token
 | GET | `/api/categorias` | Categorias |
 | GET/POST | `/api/produtos` | Lista (filtros `busca`, `categoriaId`, `somenteDisponiveis`) e cadastra |
 | GET/PUT/DELETE | `/api/produtos/{id}` | Consulta, altera e exclui |
+| GET | `/api/produtos/codigo/{codigo}` | Produto pelo código de barras (leitor do app) |
+| POST | `/api/produtos/{id}/foto` | Envia a foto (multipart, campo `foto`) |
 | GET | `/api/produtos/estoque-baixo` | Procedure de estoque baixo |
 | POST | `/api/produtos/{id}/entrada-estoque` | Procedure de entrada de estoque |
 | GET/POST | `/api/clientes` | Lista e cadastra |
@@ -203,7 +228,7 @@ Exibe indicadores gerais e gráficos (Chart.js) de faturamento por mês, produto
 
 ### Produtos
 
-Permite listar, filtrar, visualizar, criar, editar e excluir produtos, respeitando o nível de acesso do usuário.
+Permite listar, filtrar (inclusive pelo código de barras), visualizar, criar, editar e excluir produtos, respeitando o nível de acesso do usuário. Cada produto pode ter uma foto (JPG, PNG ou WebP de até 2 MB, conferida pelo conteúdo do arquivo) e um código de barras EAN/GTIN validado pelo dígito verificador. As fotos ficam em `wwwroot/uploads/produtos` (ou na pasta definida em `Fotos__Pasta`).
 
 ### Categorias
 
@@ -223,7 +248,7 @@ Permite gerenciar usuários do sistema. Acesso restrito ao nível Estratégico.
 
 ### Relatórios
 
-Permite consultar dados consolidados por período. Acesso permitido aos níveis Estratégico e Tático.
+Mostra pedidos, peças, faturamento, ticket médio, produtos mais vendidos e vendas por dia no período, com exportação em PDF e em Excel (abas Resumo, Mais vendidos e Vendas por dia). Acesso permitido aos níveis Estratégico e Tático.
 
 ### Logs
 
@@ -233,7 +258,7 @@ Permite consultar registros de auditoria do sistema. Acesso restrito ao nível E
 
 O workflow `.github/workflows/ci.yml` roda a cada push/pull request:
 
-1. compila a Web/API, roda os testes automatizados e gera o script do banco a partir das migrations;
+1. compila a Web/API, roda os 62 testes, sobe um SQL Server em container para os 10 testes de integração e gera o script do banco a partir das migrations;
 2. roda `flutter analyze` e `flutter test` no app mobile;
 3. monta a imagem Docker da aplicação.
 
@@ -242,15 +267,22 @@ Em produção, configure por variáveis de ambiente (nunca no repositório):
 - `ConnectionStrings__DefaultConnection`: conexão com o SQL Server / Azure SQL;
 - `Jwt__Key`: chave de assinatura dos tokens (mínimo de 32 caracteres);
 - `Smtp__Host`, `Smtp__Porta`, `Smtp__Usuario`, `Smtp__Senha`, `Smtp__Remetente`: envio dos e-mails de recuperação de senha. Sem SMTP, o e-mail vai para o log (e, em desenvolvimento, o link aparece na tela).
+- `Seguranca__MaxTentativasLogin` (5), `Seguranca__MinutosBloqueio` (15) e `Seguranca__LimiteRequisicoesPorMinuto` (10): proteção do login.
+- `Fotos__Pasta`: pasta das fotos dos produtos (no Docker Compose ela fica no volume `fotos-produtos`).
+
+Em produção os logs saem no console em JSON (Serilog), prontos para Application Insights ou outra ferramenta de monitoramento.
 
 ## Segurança
 
 - Senhas armazenadas com hash PBKDF2 (`PasswordHasher` do ASP.NET Core Identity).
+- Conta bloqueada por 15 minutos após 5 senhas erradas seguidas (Web e API) e limite de 10 tentativas de login ou de recuperação de senha por minuto para cada IP.
 - Recuperação de senha por link enviado por e-mail: token aleatório de uso único, válido por 30 minutos, gravado só como hash SHA-256; a resposta é a mesma exista ou não o e-mail.
 - API protegida por JWT com papéis por nível de acesso (`Estrategico`, `Tatico`, `Operacional`).
 - Web protegida por sessão e filtro de nível de acesso, com tokens antifalsificação nos formulários.
 - Regras de integridade no banco (chaves estrangeiras, `CHECK`, e-mail de usuário único).
-- Auditoria de ações em `LogSistema` (aplicação e triggers).
+- Auditoria de ações em `LogSistema` (aplicação e triggers) e logs estruturados sem dados pessoais desnecessários.
+- Upload de fotos validado pelo conteúdo do arquivo, com tamanho máximo e nome aleatório.
+- Container Docker rodando com usuário sem privilégios de root.
 
 ## Licença
 

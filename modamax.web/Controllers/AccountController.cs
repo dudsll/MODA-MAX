@@ -1,7 +1,9 @@
 using System.Net;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
+using modamax.web.Infraestrutura;
 using modamax.web.Services;
 using modamax.web.ViewModels;
 
@@ -13,17 +15,23 @@ public class AccountController : Controller
     private readonly RecuperacaoSenhaService _recuperacaoSenha;
     private readonly IEmailService _emailService;
     private readonly IWebHostEnvironment _environment;
+    private readonly LoginService _loginService;
+    private readonly SegurancaOptions _seguranca;
 
     public AccountController(
         AppDbContext context,
         RecuperacaoSenhaService recuperacaoSenha,
         IEmailService emailService,
-        IWebHostEnvironment environment)
+        IWebHostEnvironment environment,
+        LoginService loginService,
+        SegurancaOptions seguranca)
     {
         _context = context;
         _recuperacaoSenha = recuperacaoSenha;
         _emailService = emailService;
         _environment = environment;
+        _loginService = loginService;
+        _seguranca = seguranca;
     }
 
     [HttpGet]
@@ -39,6 +47,7 @@ public class AccountController : Controller
 
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting(LimiteRequisicoes.Login)]
     public async Task<IActionResult> Login(LoginViewModel viewModel)
     {
         if (!ModelState.IsValid)
@@ -46,14 +55,16 @@ public class AccountController : Controller
             return View(viewModel);
         }
 
-        var usuario = await _context.Usuarios
-            .FirstOrDefaultAsync(u => u.Email == viewModel.Email);
-
-        if (usuario == null || !SenhaService.Verificar(usuario, viewModel.Senha))
+        var resultado = await _loginService.AutenticarAsync(viewModel.Email, viewModel.Senha);
+        if (resultado.Situacao != SituacaoLogin.Sucesso)
         {
-            ModelState.AddModelError(string.Empty, "Email ou senha invalidos.");
+            ModelState.AddModelError(string.Empty, resultado.Situacao == SituacaoLogin.Bloqueado
+                ? LoginService.MensagemBloqueio(_seguranca)
+                : "Email ou senha invalidos.");
             return View(viewModel);
         }
+
+        var usuario = resultado.Usuario!;
 
         HttpContext.Session.SetInt32("UsuarioId", usuario.IdUsuario);
         HttpContext.Session.SetString("UsuarioNome", usuario.Nome);
@@ -79,6 +90,7 @@ public class AccountController : Controller
     // Sempre mostra a mesma mensagem, exista ou nao o e-mail, para nao revelar quem tem conta.
     [HttpPost]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting(LimiteRequisicoes.Login)]
     public async Task<IActionResult> RecuperarSenha(EsqueciSenhaViewModel viewModel)
     {
         if (!ModelState.IsValid)

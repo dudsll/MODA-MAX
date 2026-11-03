@@ -10,6 +10,13 @@ Para cada melhoria há o problema que existia, a solução adotada, os arquivos 
 | 3 | Dashboard com gráficos | Web, API e app |
 | 4 | Testes automatizados | Projeto `tests/` e pipeline de CI |
 | 5 | Modo rápido com SQLite | Execução local, sem Docker |
+| 6 | Bloqueio de login e limite de tentativas | Web e API |
+| 7 | Erros padronizados e logs estruturados | API e servidor |
+| 8 | Testes com SQL Server real | `tests/ModaMax.IntegrationTests` e CI |
+| 9 | Fotos e código de barras dos produtos | Web e API |
+| 10 | Leitor de código de barras | App |
+| 11 | Exportação de relatórios em PDF e Excel | Web |
+| 12 | VLibras e ajustes de layout | Web |
 
 ---
 
@@ -190,3 +197,72 @@ dotnet run --project modamax.web/modamax.web.csproj --launch-profile sqlite
 - Os gráficos dependem de internet (Chart.js via CDN).
 - Sem SMTP configurado, o e-mail de recuperação não é enviado de verdade; em produção é preciso configurar um servidor de e-mail.
 - O app Flutter não tem testes das telas novas; a validação dele no CI é feita pelo `flutter analyze` e pelo teste existente.
+
+---
+
+# Terceira etapa
+
+## 6. Bloqueio de login e limite de tentativas
+
+**Problema:** era possível testar senhas sem limite, tanto na Web quanto na API.
+
+**Solução:**
+- O `LoginService`, usado pela Web e pela API, conta as senhas erradas seguidas. Na 5ª a conta fica **bloqueada por 15 minutos**; durante o bloqueio nem a senha certa entra. O bloqueio vai para o log de auditoria.
+- Um login certo zera o contador, e redefinir a senha pelo link de recuperação desbloqueia a conta.
+- Cada endereço IP pode tentar login ou recuperação de senha **10 vezes por minuto**; depois disso recebe 429 (*Too Many Requests*).
+- Os valores ficam em `Seguranca` no `appsettings.json`.
+- Novas colunas `TentativasFalhas` e `BloqueadoAte` na tabela `Usuario`.
+
+**Como conferir:** erre a senha de `tatico@modamax.com` cinco vezes; a tela mostra "Conta bloqueada temporariamente".
+
+## 7. Erros padronizados na API e logs estruturados
+
+- Todos os erros da API seguem o padrão **Problem Details** (RFC 9457): `title`, `status`, `detail` e `traceId`, com content-type `application/problem+json`. Antes cada endpoint respondia de um jeito (`{ "mensagem": ... }` ou corpo vazio).
+- As mensagens de validação passaram para o português, e o app lê o campo `detail`.
+- Os logs usam **Serilog**: cada evento guarda seus dados em campos separados, como "Pedido {IdPedido} criado, total {ValorTotal}". Em produção saem em JSON, prontos para o Application Insights. Há também uma linha por requisição com método, caminho, status e tempo. O e-mail digitado em logins recusados não vai para o log (LGPD).
+- Arquivos: `Infraestrutura/ErrosApi.cs`, `Infraestrutura/LimiteRequisicoes.cs`, `Program.cs`.
+
+## 8. Testes com SQL Server real
+
+O projeto `tests/ModaMax.IntegrationTests` usa **Testcontainers** para subir um SQL Server 2022 em Docker, aplicar as migrations e testar o que o SQLite não tem:
+
+- as três procedures (inclusive o erro 50001 da quantidade zero);
+- os dois triggers de auditoria;
+- a restrição `CHECK` de estoque;
+- o índice único do código de barras;
+- as transações do `PedidoService`.
+
+Sem Docker os testes aparecem como ignorados; no CI eles são obrigatórios. Ao todo, o projeto tem 72 testes (62 + 10).
+
+## 9. Fotos e código de barras dos produtos
+
+- **Foto:** JPG, PNG ou WebP de até 2 MB. O tipo é conferido pelos primeiros bytes do arquivo, e não pela extensão, e o arquivo é gravado com nome aleatório. Aparece na listagem, nos detalhes e no app.
+- **Código de barras:** EAN-8, UPC-A, EAN-13 ou GTIN-14, validado pelo dígito verificador e único por produto. Os produtos de demonstração já têm códigos (ex.: `7891234500014`).
+- O armazenamento usa a interface `IArmazenamentoFotos`: hoje grava em disco (volume `fotos-produtos` no Docker); na nuvem, basta uma implementação com Azure Blob Storage.
+- **API:** `GET /api/produtos/codigo/{codigo}` e `POST /api/produtos/{id}/foto`.
+- **Correções encontradas no caminho:**
+  - o cadastro deixava digitar o ID do produto, o que falhava no SQL Server;
+  - a edição apagaria a foto ao salvar sem enviar outra;
+  - o campo de preço não aceitava vírgula no navegador, embora o sistema mostre "189,90".
+- Migration `FotosCodigoBarrasBloqueioLogin`.
+
+## 10. Leitor de código de barras no app
+
+- Na aba **Produtos**, o botão "Ler código de barras" abre a câmera (pacote `mobile_scanner`). O produto lido aparece numa ficha com foto, preço e estoque. Gerência e diretoria registram a **entrada de mercadoria** ali mesmo, pela procedure `sp_RegistrarEntradaEstoque`.
+- No **Novo pedido**, ler a etiqueta coloca a peça no carrinho; ler de novo aumenta a quantidade.
+- Leituras parciais são descartadas pelo dígito verificador, e o código também pode ser digitado: ajuda quem não consegue mirar a câmera e funciona no emulador.
+- No iOS é preciso adicionar `NSCameraUsageDescription` ao `Info.plist` depois do `flutter create`.
+
+## 11. Exportação de relatórios em PDF e Excel
+
+- A tela de relatórios ganhou indicadores do período (pedidos, peças, faturamento e ticket médio) e os botões **Exportar PDF** e **Exportar Excel**, que respeitam o filtro de datas.
+- O **Excel** (ClosedXML) tem as abas Resumo, Mais vendidos e Vendas por dia, com filtros e formato de moeda.
+- O **PDF** (QuestPDF) tem cabeçalho, quadro-resumo, tabelas e número de página.
+- **Correção:** as vendas por período eram ordenadas pelo texto "dd/MM/yyyy", o que misturava os meses. Agora a ordem é pela data. Datas invertidas no filtro são trocadas.
+
+## 12. VLibras e ajustes de layout
+
+- O tradutor oficial de LIBRAS do Governo Federal (**VLibras**) aparece em todas as páginas, no botão azul à direita. Era uma proposta do PIM III.
+- O painel mostra os cinco indicadores na mesma linha. Antes o faturamento ficava sozinho embaixo, e o menu cabe em uma linha só em telas de notebook.
+- O contêiner Docker passou a rodar com usuário sem privilégios de root.
+- Um pacote indireto com vulnerabilidade alta (`System.Security.Cryptography.Pkcs`) foi fixado na versão corrigida.

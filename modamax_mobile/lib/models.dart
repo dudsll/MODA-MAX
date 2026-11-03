@@ -40,6 +40,10 @@ class Produto {
   final int estoque;
   final String? categoria;
   final String? fornecedor;
+  final String? codigoBarras;
+
+  /// Caminho da foto na API (ex.: /uploads/produtos/abc.jpg) ou null se nao houver foto.
+  final String? fotoUrl;
 
   Produto({
     required this.idProduto,
@@ -51,7 +55,17 @@ class Produto {
     required this.estoque,
     this.categoria,
     this.fornecedor,
+    this.codigoBarras,
+    this.fotoUrl,
   });
+
+  /// Endereco completo da foto, juntando o servidor da API com o caminho devolvido por ela.
+  String? enderecoFoto(String servidor) {
+    final foto = fotoUrl;
+    if (foto == null || foto.isEmpty) return null;
+    if (foto.startsWith('http://') || foto.startsWith('https://')) return foto;
+    return '$servidor$foto';
+  }
 
   factory Produto.fromJson(Map<String, dynamic> json) => Produto(
         idProduto: json['idProduto'] as int,
@@ -63,6 +77,8 @@ class Produto {
         estoque: json['estoque'] as int,
         categoria: json['categoria'] as String?,
         fornecedor: json['fornecedor'] as String?,
+        codigoBarras: json['codigoBarras'] as String?,
+        fotoUrl: json['fotoUrl'] as String?,
       );
 }
 

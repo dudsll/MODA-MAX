@@ -64,7 +64,7 @@ public class PedidosApiController : ControllerBase
         });
         if (!resultado.Sucesso)
         {
-            return BadRequest(new { mensagem = resultado.Erro });
+            return Problem(detail: resultado.Erro, statusCode: StatusCodes.Status400BadRequest);
         }
 
         var pedido = await ConsultaCompleta().FirstAsync(p => p.IdPedido == resultado.Pedido!.IdPedido);
@@ -80,7 +80,8 @@ public class PedidosApiController : ControllerBase
         var resultado = await _pedidoService.CancelarAsync(id);
         if (!resultado.Sucesso)
         {
-            return resultado.NaoEncontrado ? NotFound() : BadRequest(new { mensagem = resultado.Erro });
+            return Problem(detail: resultado.Erro,
+                statusCode: resultado.NaoEncontrado ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
         }
 
         return NoContent();

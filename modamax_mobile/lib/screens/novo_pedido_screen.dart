@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../widgets/comum.dart';
+import 'leitor_screen.dart';
 
 /// Registro de pedido pelo app: escolhe cliente, tipo de venda e itens.
 /// A API valida estoque, aplica 10% de desconto no atacado e da baixa no estoque.
@@ -53,7 +54,24 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       ),
     );
     if (produto == null) return;
+    _adicionarAoCarrinho(produto);
+  }
 
+  /// Le a etiqueta e coloca o produto no carrinho; ler de novo aumenta a quantidade.
+  Future<void> _lerCodigo(List<Produto> produtos) async {
+    final codigo = await LeitorCodigoScreen.abrir(context, titulo: 'Adicionar pelo código');
+    if (codigo == null || !mounted) return;
+
+    final produto = produtos.where((p) => p.codigoBarras == codigo).firstOrNull;
+    if (produto == null) {
+      mostrarMensagem(context, 'Nenhum produto disponível com o código $codigo.');
+      return;
+    }
+    _adicionarAoCarrinho(produto);
+    mostrarMensagem(context, '${produto.nome} adicionado.');
+  }
+
+  void _adicionarAoCarrinho(Produto produto) {
     setState(() {
       final existente = _itens.where((i) => i.produto.idProduto == produto.idProduto).firstOrNull;
       if (existente != null) {
@@ -128,6 +146,11 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
               Row(
                 children: [
                   Expanded(child: Text('Itens', style: Theme.of(context).textTheme.titleMedium)),
+                  IconButton(
+                    tooltip: 'Adicionar pelo código de barras',
+                    onPressed: () => _lerCodigo(produtos),
+                    icon: const Icon(Icons.qr_code_scanner),
+                  ),
                   TextButton.icon(
                     onPressed: () => _adicionarProduto(produtos),
                     icon: const Icon(Icons.add),

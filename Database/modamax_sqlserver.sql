@@ -267,3 +267,20 @@ VALUES (N'20261031213905_RecuperacaoSenha', N'10.0.14');
 COMMIT;
 GO
 
+BEGIN TRANSACTION;
+ALTER TABLE [Usuario] ADD [BloqueadoAte] datetime2 NULL;
+
+ALTER TABLE [Usuario] ADD [TentativasFalhas] int NOT NULL DEFAULT 0;
+
+ALTER TABLE [Produto] ADD [CodigoBarras] nvarchar(14) NULL;
+
+ALTER TABLE [Produto] ADD [FotoUrl] nvarchar(300) NULL;
+
+CREATE UNIQUE INDEX [IX_Produto_CodigoBarras] ON [Produto] ([CodigoBarras]) WHERE [CodigoBarras] IS NOT NULL;
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20261103162233_FotosCodigoBarrasBloqueioLogin', N'10.0.14');
+
+COMMIT;
+GO
+

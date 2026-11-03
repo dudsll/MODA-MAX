@@ -255,6 +255,10 @@ namespace modamax.web.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdProduto"));
 
+                    b.Property<string>("CodigoBarras")
+                        .HasMaxLength(14)
+                        .HasColumnType("nvarchar(14)");
+
                     b.Property<string>("Cor")
                         .IsRequired()
                         .HasMaxLength(30)
@@ -266,6 +270,10 @@ namespace modamax.web.Migrations
 
                     b.Property<int>("Estoque")
                         .HasColumnType("int");
+
+                    b.Property<string>("FotoUrl")
+                        .HasMaxLength(300)
+                        .HasColumnType("nvarchar(300)");
 
                     b.Property<int>("IdCategoria")
                         .HasColumnType("int");
@@ -288,6 +296,10 @@ namespace modamax.web.Migrations
                         .HasColumnType("nvarchar(10)");
 
                     b.HasKey("IdProduto");
+
+                    b.HasIndex("CodigoBarras")
+                        .IsUnique()
+                        .HasFilter("[CodigoBarras] IS NOT NULL");
 
                     b.HasIndex("IdCategoria");
 
@@ -348,6 +360,9 @@ namespace modamax.web.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdUsuario"));
 
+                    b.Property<DateTime?>("BloqueadoAte")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -367,6 +382,9 @@ namespace modamax.web.Migrations
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("nvarchar(256)");
+
+                    b.Property<int>("TentativasFalhas")
+                        .HasColumnType("int");
 
                     b.HasKey("IdUsuario");
 
