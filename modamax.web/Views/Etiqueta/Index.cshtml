@@ -1,0 +1,63 @@
+@using modamax.web.Services
+@model List<modamax.web.Models.Produto>
+@{
+    ViewData["Title"] = "Etiquetas";
+    var semCodigo = Model.Where(p => CodigoBarras.ModulosEan13(p.CodigoBarras) == null).Select(p => p.Nome).Distinct().ToList();
+}
+
+<div class="page-header nao-imprimir">
+    <div>
+        <p class="section-kicker">Catálogo</p>
+        <h1>Etiquetas com código de barras</h1>
+        <p class="page-copy">Imprima e cole nas peças: o vendedor lê a etiqueta com a câmera do aplicativo para consultar o produto, dar entrada no estoque ou incluir no pedido.</p>
+    </div>
+    <div class="header-actions">
+        <button type="button" class="btn btn-primary" onclick="window.print()">
+            <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-printer" /></svg>Imprimir @Model.Count etiqueta(s)
+        </button>
+    </div>
+</div>
+
+<div class="content-card mb-4 nao-imprimir">
+    <form method="get" class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label" for="categoriaId">Categoria</label>
+            <select id="categoriaId" name="categoriaId" asp-items="ViewBag.Categorias" class="form-select">
+                <option value="">Todas</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label" for="copias">Cópias de cada</label>
+            <input id="copias" name="copias" type="number" min="1" max="20" value="@ViewBag.Copias" class="form-control" />
+        </div>
+        <div class="col-md-2 d-flex align-items-end">
+            <button class="btn btn-outline-primary" type="submit">Gerar</button>
+        </div>
+    </form>
+    @if (semCodigo.Count > 0)
+    {
+        <div class="alert alert-warning mt-3 mb-0">Sem código de barras EAN-13 válido: @string.Join(", ", semCodigo). Cadastre o código no produto para imprimir as barras.</div>
+    }
+</div>
+
+<div class="etiquetas-grade">
+    @foreach (var produto in Model)
+    {
+        var svg = CodigoBarras.SvgEan13(produto.CodigoBarras);
+        <div class="etiqueta">
+            <small>ModaMax · @produto.Categoria?.Nome</small>
+            <strong>@produto.Nome</strong>
+            <small>Tam. @produto.Tamanho · @produto.Cor</small>
+            <div class="preco">@produto.Preco.ToString("C")</div>
+            @if (svg != null)
+            {
+                @* SVG gerado pelo sistema a partir dos digitos do codigo (nao contem texto do usuario). *@
+                @Html.Raw(svg)
+            }
+            else
+            {
+                <small>Sem código de barras</small>
+            }
+        </div>
+    }
+</div>

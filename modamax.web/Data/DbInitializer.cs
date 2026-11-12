@@ -52,10 +52,10 @@ public static class DbInitializer
             new() { Nome = "Bermuda Jeans", Descricao = "Bermuda jeans de cintura media.", Tamanho = "40", Cor = "Azul", Preco = 120.85m, Estoque = 150, IdFornecedor = 2 },
             new() { Nome = "Short Jeans", Descricao = "Short jeans para colecao primavera.", Tamanho = "38", Cor = "Azul", Preco = 160.73m, Estoque = 120, IdFornecedor = 3 },
             new() { Nome = "Colete Jeans", Descricao = "Colete jeans com lavagem clara.", Tamanho = "G", Cor = "Azul claro", Preco = 120.75m, Estoque = 84, IdFornecedor = 1 },
-            new() { Nome = "Saia Jeans", Descricao = "Saia jeans tradicional.", Tamanho = "36", Cor = "Azul claro", Preco = 170.00m, Estoque = 45, IdFornecedor = 3 },
+            new() { Nome = "Saia Jeans", Descricao = "Saia jeans tradicional.", Tamanho = "36", Cor = "Azul claro", Preco = 170.00m, Estoque = 34, IdFornecedor = 3 },
             new() { Nome = "Blusa Jeans", Descricao = "Blusa jeans feminina.", Tamanho = "M", Cor = "Azul claro", Preco = 98.60m, Estoque = 150, IdFornecedor = 1 },
             new() { Nome = "Calca Jeans", Descricao = "Calca jeans reta.", Tamanho = "46", Cor = "Azul", Preco = 140.00m, Estoque = 81, IdFornecedor = 3 },
-            new() { Nome = "Jaqueta Jeans Premium", Descricao = "Jaqueta premium para inverno.", Tamanho = "GG", Cor = "Azul claro", Preco = 170.97m, Estoque = 42, IdFornecedor = 2 }
+            new() { Nome = "Jaqueta Jeans Premium", Descricao = "Jaqueta premium para inverno.", Tamanho = "GG", Cor = "Azul claro", Preco = 170.97m, Estoque = 30, IdFornecedor = 2 }
         };
 
         var clientes = new List<Cliente>
@@ -69,11 +69,11 @@ public static class DbInitializer
 
         var pedidos = new List<Pedido>
         {
-            new() { DataPedido = new DateTime(2026, 6, 1), TiposVenda = "Varejo", Status = "Finalizado", ValorTotal = 160.73m },
-            new() { DataPedido = new DateTime(2026, 6, 1), TiposVenda = "Varejo", Status = "Finalizado", ValorTotal = 120.75m },
-            new() { DataPedido = new DateTime(2026, 6, 2), TiposVenda = "Varejo", Status = "Finalizado", ValorTotal = 170.97m },
+            new() { DataPedido = new DateTime(2026, 6, 1), TiposVenda = "Varejo", Status = "Finalizado", StatusPagamento = "Pago", ValorTotal = 160.73m },
+            new() { DataPedido = new DateTime(2026, 6, 1), TiposVenda = "Varejo", Status = "Finalizado", StatusPagamento = "Pago", ValorTotal = 120.75m },
+            new() { DataPedido = new DateTime(2026, 6, 2), TiposVenda = "Varejo", Status = "Finalizado", StatusPagamento = "Pago", ValorTotal = 170.97m },
             new() { DataPedido = new DateTime(2026, 6, 3), TiposVenda = "Varejo", Status = "Em separação", ValorTotal = 140.00m },
-            new() { DataPedido = new DateTime(2026, 6, 3), TiposVenda = "Varejo", Status = "Finalizado", ValorTotal = 98.60m }
+            new() { DataPedido = new DateTime(2026, 6, 3), TiposVenda = "Varejo", Status = "Finalizado", StatusPagamento = "Pago", ValorTotal = 98.60m }
         };
 
         var itensPedido = new List<ItemPedido>
@@ -152,29 +152,41 @@ public static class DbInitializer
         context.SaveChanges();
     }
 
-    // Vendas espalhadas pelos ultimos 4 meses para o dashboard e os relatorios terem dados.
-    // A semente fixa do Random faz a base de demonstracao ser sempre a mesma.
+    // Vendas espalhadas pelos ultimos 5 meses (com mais movimento no ultimo mes) para o painel,
+    // os relatorios, a curva ABC e a central de reposicao terem dados. A semente fixa do Random
+    // faz a base de demonstracao ser sempre a mesma.
     private static void GerarVendasDemonstracao(AppDbContext context, List<Cliente> clientes, List<Produto> produtos)
     {
         var aleatorio = new Random(2026);
         var hoje = DateTime.Today;
+        var formas = new[] { "Pix", "Pix", "Pix", "Pix", "Credito", "Credito", "Credito", "Debito", "Boleto", "Dinheiro" };
+        var geradas = new List<Pedido>();
 
-        for (var n = 0; n < 48; n++)
+        for (var n = 0; n < 64; n++)
         {
-            var data = hoje.AddDays(-aleatorio.Next(0, 120)).AddHours(aleatorio.Next(9, 19));
+            var dias = aleatorio.Next(10) < 4 ? aleatorio.Next(0, 30) : aleatorio.Next(0, 150);
+            var data = hoje.AddDays(-dias).AddHours(aleatorio.Next(9, 19));
             var tipoVenda = aleatorio.Next(4) == 0 ? "Atacado" : "Varejo";
             var sorteio = aleatorio.Next(10);
             var status = sorteio == 0 ? PedidoService.StatusCancelado
                 : data > hoje.AddDays(-7) && sorteio < 4 ? PedidoService.StatusEmSeparacao
                 : PedidoService.StatusFinalizado;
 
+            var forma = formas[aleatorio.Next(formas.Length)];
             var pedido = new Pedido
             {
                 Cliente = clientes[aleatorio.Next(clientes.Count)],
                 DataPedido = data,
                 TiposVenda = tipoVenda,
-                Status = status
+                Status = status,
+                FormaPagamento = forma,
+                Parcelas = forma == "Credito" ? aleatorio.Next(1, Pagamentos.MaxParcelas + 1) : 1,
+                // Finalizados ja foram pagos; em separacao, so parte; cancelados pagos foram estornados.
+                StatusPagamento = status == PedidoService.StatusFinalizado ? Pagamentos.Pago
+                    : status == PedidoService.StatusEmSeparacao ? (forma == "Pix" ? Pagamentos.Pago : Pagamentos.Pendente)
+                    : aleatorio.Next(2) == 0 ? Pagamentos.Estornado : Pagamentos.Pendente
             };
+            pedido.PagoEm = pedido.StatusPagamento == Pagamentos.Pago ? data.AddMinutes(aleatorio.Next(5, 240)) : null;
 
             var qtdItens = aleatorio.Next(1, 4);
             foreach (var produto in produtos.OrderBy(_ => aleatorio.Next()).Take(qtdItens))
@@ -204,7 +216,43 @@ public static class DbInitializer
             if (pedido.Itens.Count > 0)
             {
                 context.Pedidos.Add(pedido);
+                geradas.Add(pedido);
             }
         }
+
+        // Metas dos meses anteriores (algumas batidas, outras nao) e a do mes atual,
+        // definida como a media dos tres meses anteriores mais 10%.
+        decimal FaturamentoDoMes(DateTime mes) => geradas
+            .Where(p => p.Status != PedidoService.StatusCancelado && p.DataPedido.Year == mes.Year && p.DataPedido.Month == mes.Month)
+            .Sum(p => p.ValorTotal);
+        int PedidosDoMes(DateTime mes) => geradas.Count(p => p.Status != PedidoService.StatusCancelado && p.DataPedido.Year == mes.Year && p.DataPedido.Month == mes.Month);
+        int PecasDoMes(DateTime mes) => geradas
+            .Where(p => p.Status != PedidoService.StatusCancelado && p.DataPedido.Year == mes.Year && p.DataPedido.Month == mes.Month)
+            .Sum(p => p.Itens.Sum(i => i.Quantidade));
+
+        var inicioMes = new DateTime(hoje.Year, hoje.Month, 1);
+        var fatores = new[] { 1.08m, 0.94m, 1.12m, 0.97m };
+        for (var i = 1; i <= fatores.Length; i++)
+        {
+            var mes = inicioMes.AddMonths(-i);
+            context.Metas.Add(new Meta
+            {
+                Ano = mes.Year,
+                Mes = mes.Month,
+                Faturamento = Math.Round(FaturamentoDoMes(mes) * fatores[i - 1] / 100, MidpointRounding.AwayFromZero) * 100,
+                Pedidos = Math.Max(1, (int)Math.Round(PedidosDoMes(mes) * fatores[i - 1])),
+                Pecas = Math.Max(1, (int)Math.Round(PecasDoMes(mes) * fatores[i - 1]))
+            });
+        }
+
+        var anteriores = Enumerable.Range(1, 3).Select(i => inicioMes.AddMonths(-i)).ToList();
+        context.Metas.Add(new Meta
+        {
+            Ano = hoje.Year,
+            Mes = hoje.Month,
+            Faturamento = Math.Round(anteriores.Average(FaturamentoDoMes) * 1.1m / 100, MidpointRounding.AwayFromZero) * 100,
+            Pedidos = (int)Math.Ceiling(anteriores.Average(m => PedidosDoMes(m)) * 1.1),
+            Pecas = (int)Math.Ceiling(anteriores.Average(m => PecasDoMes(m)) * 1.1)
+        });
     }
 }

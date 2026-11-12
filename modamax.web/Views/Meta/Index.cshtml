@@ -1,0 +1,161 @@
+@model modamax.web.Controllers.MetasViewModel
+@{
+    ViewData["Title"] = "Metas";
+    var atual = Model.Atual;
+    var meses = Enumerable.Range(1, 12).Select(m => new { Valor = m, Nome = System.Globalization.CultureInfo.GetCultureInfo("pt-BR").DateTimeFormat.GetMonthName(m) });
+}
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Visão geral</p>
+        <h1>Metas de vendas</h1>
+        <p class="page-copy">Acompanhe o mês como no app Atividade: cada anel fecha quando a meta é batida.</p>
+    </div>
+</div>
+
+@if (TempData["Mensagem"] != null)
+{
+    <div class="aviso-flutuante" role="status"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-circle-check" /></svg>@TempData["Mensagem"]</div>
+}
+@if (TempData["Erro"] != null)
+{
+    <div class="alert alert-danger">@TempData["Erro"]</div>
+}
+
+<section class="content-grid">
+    <article class="content-card">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">@atual.NomeMes</p>
+                <h2>Progresso do mês</h2>
+            </div>
+            @if (!atual.Definida)
+            {
+                <span class="status status-laranja">Meta sugerida</span>
+            }
+        </div>
+        <partial name="_AneisMeta" model="atual" />
+    </article>
+
+    <article class="content-card">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Ritmo</p>
+                <h2>Projeção de fechamento</h2>
+            </div>
+        </div>
+        <div class="metrics-grid" style="grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: 0">
+            <div class="metric-card">
+                <span class="metric-label">Projeção do mês</span>
+                <strong>@atual.ProjecaoFaturamento.ToString("C0")</strong>
+                @{
+                    var diferenca = atual.Faturamento.Meta == 0 ? 0 : (int)Math.Round((atual.ProjecaoFaturamento / atual.Faturamento.Meta - 1) * 100);
+                }
+                <span class="variacao @(diferenca >= 0 ? "positiva" : "negativa")">@(diferenca >= 0 ? "+" : "")@diferenca% da meta</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-label">Necessário por dia</span>
+                <strong>@atual.NecessarioPorDia.ToString("C0")</strong>
+                <span class="variacao neutra">@atual.DiasRestantes dias restantes</span>
+            </div>
+        </div>
+        <p class="text-muted mt-3 mb-0">
+            A projeção mantém o ritmo dos @atual.DiasDecorridos primeiros dias até o fim do mês.
+            Pedidos cancelados não contam.
+        </p>
+    </article>
+</section>
+
+<article class="content-card" style="margin-top:1.25rem">
+    <div class="section-heading">
+        <div>
+            <p class="section-kicker">Histórico</p>
+            <h2>Últimos meses</h2>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-modern">
+            <thead>
+                <tr><th>Mês</th><th>Meta</th><th>Realizado</th><th style="width:30%">Atingido</th><th class="text-end">Resultado</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var mes in Model.Historico.AsEnumerable().Reverse())
+            {
+                var percentual = mes.Faturamento.Percentual;
+                <tr>
+                    <td>@mes.NomeMes</td>
+                    <td>@mes.Faturamento.Meta.ToString("C0")</td>
+                    <td>@mes.Faturamento.Realizado.ToString("C0")</td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="barra flex-grow-1" role="img" aria-label="@percentual% da meta">
+                                <span style="width:@Math.Min(percentual, 100)%; background:@(percentual >= 100 ? "var(--verde-vivo)" : "var(--azul)")"></span>
+                            </div>
+                            <span class="mono">@percentual%</span>
+                        </div>
+                    </td>
+                    <td class="text-end">
+                        @if (!mes.Definida)
+                        {
+                            <span class="status">Sem meta</span>
+                        }
+                        else if (percentual >= 100)
+                        {
+                            <span class="status status-verde">Meta batida</span>
+                        }
+                        else
+                        {
+                            <span class="status status-laranja">Abaixo da meta</span>
+                        }
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</article>
+
+@if (Model.PodeEditar)
+{
+    <article class="content-card form-card" style="margin-top:1.25rem">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">Diretoria</p>
+                <h2>Definir meta</h2>
+            </div>
+        </div>
+        <form asp-action="Salvar" method="post" class="row g-3">
+            <div class="col-md-2">
+                <label class="form-label" for="Mes">Mês</label>
+                <select class="form-select" id="Mes" name="Mes">
+                    @foreach (var m in meses)
+                    {
+                        <option value="@m.Valor" selected="@(m.Valor == Model.Formulario.Mes)">@m.Nome</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="Ano">Ano</label>
+                <input class="form-control" id="Ano" name="Ano" type="number" value="@Model.Formulario.Ano" min="2020" max="2100" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="Faturamento">Faturamento (R$)</label>
+                <input class="form-control" id="Faturamento" name="Faturamento" inputmode="decimal" value="@Model.Formulario.Faturamento.ToString("N2")" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="Pedidos">Pedidos</label>
+                <input class="form-control" id="Pedidos" name="Pedidos" type="number" min="0" value="@Model.Formulario.Pedidos" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="Pecas">Peças</label>
+                <input class="form-control" id="Pecas" name="Pecas" type="number" min="0" value="@Model.Formulario.Pecas" />
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button class="btn btn-primary w-100" type="submit">Salvar</button>
+            </div>
+            <p class="form-text mb-0">
+                @(Model.Formulario.IdMeta > 0 ? "Meta já cadastrada para o mês escolhido." : "Valores sugeridos: média dos três meses anteriores com 10% de crescimento.")
+            </p>
+        </form>
+    </article>
+}

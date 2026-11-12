@@ -17,7 +17,7 @@ namespace modamax.web.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.14")
+                .HasAnnotation("ProductVersion", "10.0.15")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -171,6 +171,37 @@ namespace modamax.web.Migrations
                     b.ToTable("LogSistema");
                 });
 
+            modelBuilder.Entity("modamax.web.Models.Meta", b =>
+                {
+                    b.Property<int>("IdMeta")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("IdMeta"));
+
+                    b.Property<int>("Ano")
+                        .HasColumnType("int");
+
+                    b.Property<decimal>("Faturamento")
+                        .HasColumnType("decimal(12,2)");
+
+                    b.Property<int>("Mes")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Pecas")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Pedidos")
+                        .HasColumnType("int");
+
+                    b.HasKey("IdMeta");
+
+                    b.HasIndex("Ano", "Mes")
+                        .IsUnique();
+
+                    b.ToTable("Meta");
+                });
+
             modelBuilder.Entity("modamax.web.Models.MovimentacaoEstoque", b =>
                 {
                     b.Property<int>("IdMovi")
@@ -215,13 +246,29 @@ namespace modamax.web.Migrations
                     b.Property<DateTime>("DataPedido")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("FormaPagamento")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<int>("IdCliente")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("PagoEm")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Parcelas")
                         .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("StatusPagamento")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<string>("TiposVenda")
                         .IsRequired()
@@ -240,6 +287,8 @@ namespace modamax.web.Migrations
                     b.ToTable("Pedido", t =>
                         {
                             t.HasTrigger("trg_Pedido_AuditaStatus");
+
+                            t.HasCheckConstraint("CK_Pedido_Parcelas", "[Parcelas] BETWEEN 1 AND 6");
 
                             t.HasCheckConstraint("CK_Pedido_ValorTotal", "[ValorTotal] >= 0");
                         });

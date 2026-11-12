@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modamax_mobile/codigo_barras.dart';
 import 'package:modamax_mobile/models.dart';
+import 'package:modamax_mobile/widgets/aneis.dart';
 
 void main() {
   test('formata valores em reais', () {
@@ -60,5 +62,62 @@ void main() {
     expect(produto.enderecoFoto('http://10.0.2.2:5248'), 'http://10.0.2.2:5248/uploads/produtos/abc.jpg');
     final semFoto = Produto.fromJson({'idProduto': 1, 'nome': 'Saia', 'tamanho': '36', 'cor': 'Azul', 'preco': 170, 'estoque': 45});
     expect(semFoto.enderecoFoto('http://10.0.2.2:5248'), isNull);
+  });
+
+  test('pedido traz o pagamento e aceita cache antigo sem esses campos', () {
+    final base = {
+      'idPedido': 7,
+      'idCliente': 1,
+      'dataPedido': '2026-11-10T10:00:00',
+      'tiposVenda': 'Varejo',
+      'status': 'Em separação',
+      'valorTotal': 600,
+      'itens': <dynamic>[],
+    };
+    final pago = Pedido.fromJson({...base, 'formaPagamento': 'Credito', 'parcelas': 3, 'statusPagamento': 'Pago'});
+    final antigo = Pedido.fromJson(base);
+
+    expect(nomePagamento(pago.formaPagamento), 'Cartão de crédito');
+    expect(pago.parcelas, 3);
+    expect(pago.pagamentoPendente, isFalse);
+    expect(antigo.formaPagamento, 'Pix');
+    expect(antigo.pagamentoPendente, isTrue);
+  });
+
+  MetaAtual metaDeExemplo() => MetaAtual.fromJson({
+        'mes': 'Novembro de 2026',
+        'definida': true,
+        'faturamento': {'meta': 8100, 'realizado': 5441, 'percentual': 67},
+        'pedidos': {'meta': 14, 'realizado': 9, 'percentual': 64},
+        'pecas': {'meta': 61, 'realizado': 42, 'percentual': 69},
+        'projecaoFaturamento': 14840,
+        'diasRestantes': 19,
+      });
+
+  test('converte metas e itens de reposicao', () {
+    final meta = metaDeExemplo();
+    expect(meta.faturamento.percentual, 67);
+    expect(meta.diasRestantes, 19);
+
+    final item = ItemReposicao.fromJson({
+      'idProduto': 7,
+      'produto': 'Saia Jeans',
+      'estoque': 8,
+      'vendidosNoPeriodo': 17,
+      'diasDeCobertura': 14,
+      'quantidadeSugerida': 22,
+      'situacao': 'Critico',
+    });
+    expect(item.critico, isTrue);
+    expect(item.quantidadeSugerida, 22);
+  });
+
+  testWidgets('aneis de meta mostram os percentuais', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: AneisMeta(meta: metaDeExemplo()))));
+
+    expect(find.text('67%'), findsOneWidget);
+    expect(find.text('64%'), findsOneWidget);
+    expect(find.text('69%'), findsOneWidget);
+    expect(find.text('Peças'), findsOneWidget);
   });
 }

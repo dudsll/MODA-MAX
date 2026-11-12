@@ -24,6 +24,10 @@ public class DadosPedido
 
     public string Status { get; set; } = PedidoService.StatusEmSeparacao;
 
+    public string FormaPagamento { get; set; } = "Pix";
+
+    public int Parcelas { get; set; } = 1;
+
     public IReadOnlyList<ItemPedidoEntrada> Itens { get; set; } = Array.Empty<ItemPedidoEntrada>();
 }
 
@@ -119,9 +123,33 @@ public class PedidoService
 
             DevolverEstoque(pedido, $"Cancelamento do pedido #{pedido.IdPedido}");
             pedido.Status = StatusCancelado;
+            // Pedido pago e cancelado: o valor precisa ser devolvido ao cliente.
+            if (pedido.StatusPagamento == Pagamentos.Pago)
+            {
+                pedido.StatusPagamento = Pagamentos.Estornado;
+            }
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("Pedido {IdPedido} cancelado; estoque devolvido", pedido.IdPedido);
+            return new ResultadoPedido { Pedido = pedido };
+        });
+    }
+
+    // Registra o recebimento do pedido (PIX recebido, cartao aprovado, boleto compensado...).
+    public Task<ResultadoPedido> ConfirmarPagamentoAsync(int idPedido)
+    {
+        return EmTransacaoAsync(async () =>
+        {
+            var pedido = await _context.Pedidos.FirstOrDefaultAsync(p => p.IdPedido == idPedido);
+            if (pedido == null) return NaoEncontrado();
+            if (pedido.Status == StatusCancelado) return Falha("Pedido cancelado nao pode ser pago.");
+            if (pedido.StatusPagamento == Pagamentos.Pago) return Falha("O pagamento deste pedido ja foi confirmado.");
+
+            pedido.StatusPagamento = Pagamentos.Pago;
+            pedido.PagoEm = DateTime.Now;
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Pagamento do pedido {IdPedido} confirmado: {FormaPagamento}, {ValorTotal}",
+                pedido.IdPedido, pedido.FormaPagamento, pedido.ValorTotal);
             return new ResultadoPedido { Pedido = pedido };
         });
     }
@@ -152,6 +180,8 @@ public class PedidoService
         if (dados.Itens.Count == 0) return "O pedido precisa ter ao menos um item.";
         if (!StatusValidos.Contains(dados.Status)) return "Status de pedido invalido.";
         if (dados.TiposVenda != "Varejo" && dados.TiposVenda != "Atacado") return "Tipo de venda invalido.";
+        var erroPagamento = Pagamentos.Validar(dados.FormaPagamento, dados.Parcelas);
+        if (erroPagamento != null) return erroPagamento;
         if (!await _context.Clientes.AnyAsync(c => c.IdCliente == dados.IdCliente)) return "Cliente nao encontrado.";
         return null;
     }
@@ -163,6 +193,12 @@ public class PedidoService
         pedido.DataPedido = dados.DataPedido;
         pedido.TiposVenda = dados.TiposVenda;
         pedido.Status = dados.Status;
+        pedido.FormaPagamento = dados.FormaPagamento;
+        pedido.Parcelas = dados.Parcelas;
+        if (dados.Status == StatusCancelado && pedido.StatusPagamento == Pagamentos.Pago)
+        {
+            pedido.StatusPagamento = Pagamentos.Estornado;
+        }
         pedido.ValorTotal = 0m;
 
         foreach (var entrada in dados.Itens)

@@ -1,0 +1,40 @@
+@model modamax.web.Services.ProgressoMeta
+@{
+    // Tres aneis concentricos (faturamento, pedidos e pecas), no estilo do app Atividade da Apple.
+    var aneis = new[]
+    {
+        (Classe: "anel-1", Raio: 80, Indicador: Model.Faturamento, Cor: "#fa114f", Rotulo: "Faturamento", Valor: $"{Model.Faturamento.Realizado:C0} de {Model.Faturamento.Meta:C0}"),
+        (Classe: "anel-2", Raio: 61, Indicador: Model.Pedidos, Cor: "#5ec11d", Rotulo: "Pedidos", Valor: $"{Model.Pedidos.Realizado:0} de {Model.Pedidos.Meta:0}"),
+        (Classe: "anel-3", Raio: 42, Indicador: Model.Pecas, Cor: "#00a8e8", Rotulo: "Peças vendidas", Valor: $"{Model.Pecas.Realizado:0} de {Model.Pecas.Meta:0}")
+    };
+    var descricao = string.Join("; ", aneis.Select(a => $"{a.Rotulo}: {a.Indicador.Percentual}% da meta ({a.Valor})"));
+}
+
+<div class="metas-cartao">
+    <div class="aneis" role="img" aria-label="Metas de @Model.NomeMes. @descricao">
+        <svg viewBox="0 0 200 200" aria-hidden="true">
+            @foreach (var anel in aneis)
+            {
+                var circunferencia = 2 * Math.PI * anel.Raio;
+                var preenchido = Math.Min(anel.Indicador.Percentual, 100) / 100.0;
+                <circle class="trilho @anel.Classe" cx="100" cy="100" r="@anel.Raio" />
+                <circle class="progresso @anel.Classe" cx="100" cy="100" r="@anel.Raio"
+                        stroke-dasharray="@circunferencia.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture)"
+                        stroke-dashoffset="@((circunferencia * (1 - preenchido)).ToString("0.##", System.Globalization.CultureInfo.InvariantCulture))" />
+            }
+        </svg>
+    </div>
+    <div class="metas-legenda">
+        @foreach (var anel in aneis)
+        {
+            <div class="item">
+                <span class="ponto" style="background:@anel.Cor"></span>
+                <span>
+                    <span class="rotulo">@anel.Rotulo</span><br />
+                    <span class="valor">@anel.Valor</span>
+                </span>
+                <span class="percentual">@anel.Indicador.Percentual%</span>
+            </div>
+        }
+    </div>
+</div>

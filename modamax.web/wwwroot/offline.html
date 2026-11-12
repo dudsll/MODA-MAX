@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sem conexão · ModaMax</title>
+  <link rel="stylesheet" href="/css/site.css" />
+</head>
+<body class="publico">
+  <main class="conteudo" style="text-align:center">
+    <div class="content-card" style="max-width:28rem;margin:auto">
+      <img src="/img/icone.svg" alt="" width="64" height="64" style="margin-bottom:1rem" />
+      <h1 style="font-size:1.6rem">Você está sem conexão</h1>
+      <p class="page-copy" style="margin:0.5rem auto 1.25rem">O ModaMax precisa de internet para mostrar os dados atualizados de vendas e estoque.</p>
+      <button class="btn btn-primary" onclick="location.reload()">Tentar de novo</button>
+    </div>
+  </main>
+  <script>
+    try {
+      var t = localStorage.getItem('modamax-tema');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+    } catch (e) { }
+  </script>
+</body>
+</html>

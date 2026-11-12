@@ -25,6 +25,20 @@ public class Pedido
     [Column(TypeName = "decimal(10,2)")]
     public decimal ValorTotal { get; set; }
 
+    // Pagamento: forma (Pix, Credito, Debito, Boleto, Dinheiro), parcelas (so no credito) e situacao.
+    [Display(Name = "Forma de pagamento")]
+    [StringLength(20)]
+    public string FormaPagamento { get; set; } = "Pix";
+
+    [Range(1, 6)]
+    public int Parcelas { get; set; } = 1;
+
+    [Display(Name = "Pagamento")]
+    [StringLength(20)]
+    public string StatusPagamento { get; set; } = "Pendente";
+
+    public DateTime? PagoEm { get; set; }
+
     public Cliente? Cliente { get; set; }
 
     public ICollection<ItemPedido> Itens { get; set; } = new List<ItemPedido>();

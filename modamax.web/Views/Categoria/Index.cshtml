@@ -8,6 +8,6 @@
 </div>
 <div class="content-card"><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Codigo</th><th>Nome</th><th class="text-end">Ações</th></tr></thead><tbody>
 @foreach (var item in Model) {
-<tr><td>@item.IdCategoria</td><td>@item.Nome</td><td class="text-end"><a asp-action="Edit" asp-route-id="@item.IdCategoria">Editar</a> | <a asp-action="Details" asp-route-id="@item.IdCategoria">Detalhes</a> | <a asp-action="Delete" asp-route-id="@item.IdCategoria">Excluir</a></td></tr>
+<tr><td>@item.IdCategoria</td><td>@item.Nome</td><td class="text-end"><span class="acoes-linha"><a asp-action="Details" asp-route-id="@item.IdCategoria" aria-label="Detalhes" title="Detalhes"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-eye" /></svg></a><a asp-action="Edit" asp-route-id="@item.IdCategoria" aria-label="Editar" title="Editar"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-pencil" /></svg></a><a class="perigo" asp-action="Delete" asp-route-id="@item.IdCategoria" aria-label="Excluir" title="Excluir"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-trash-2" /></svg></a></span></td></tr>
 }
 </tbody></table></div></div>

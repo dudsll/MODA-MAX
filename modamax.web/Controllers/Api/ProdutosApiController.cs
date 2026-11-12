@@ -15,11 +15,13 @@ public class ProdutosApiController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly IArmazenamentoFotos _fotos;
+    private readonly ReposicaoService _reposicao;
 
-    public ProdutosApiController(AppDbContext context, IArmazenamentoFotos fotos)
+    public ProdutosApiController(AppDbContext context, IArmazenamentoFotos fotos, ReposicaoService reposicao)
     {
         _context = context;
         _fotos = fotos;
+        _reposicao = reposicao;
     }
 
     // GET /api/produtos?busca=jeans&categoriaId=3&somenteDisponiveis=true
@@ -126,19 +128,13 @@ public class ProdutosApiController : ControllerBase
         return produtos;
     }
 
-    // POST /api/produtos/5/entrada-estoque  { quantidade, observacao }  (procedure sp_RegistrarEntradaEstoque)
+    // POST /api/produtos/5/entrada-estoque  { quantidade, observacao }  (procedure sp_RegistrarEntradaEstoque no SQL Server)
     [HttpPost("{id:int}/entrada-estoque")]
     [Authorize(Roles = "Estrategico,Tatico")]
     public async Task<ActionResult<object>> EntradaEstoque(int id, EntradaEstoqueDto dto)
     {
-        if (!await _context.Produtos.AnyAsync(p => p.IdProduto == id)) return NotFound();
-
-        var estoqueAtual = (await _context.Database
-            .SqlQuery<int>($"EXEC dbo.sp_RegistrarEntradaEstoque @IdProduto = {id}, @Quantidade = {dto.Quantidade}, @Observacao = {dto.Observacao}")
-            .ToListAsync())
-            .Single();
-
-        return new { idProduto = id, estoque = estoqueAtual };
+        var estoqueAtual = await _reposicao.RegistrarEntradaAsync(id, dto.Quantidade, dto.Observacao);
+        return estoqueAtual == null ? NotFound() : new { idProduto = id, estoque = estoqueAtual };
     }
 
     // POST /api/produtos

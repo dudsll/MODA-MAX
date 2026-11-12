@@ -87,6 +87,11 @@ builder.Services.AddScoped<RecuperacaoSenhaService>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<LoginService>();
 builder.Services.AddScoped<RelatorioService>();
+builder.Services.AddScoped<MetaService>();
+builder.Services.AddScoped<ReposicaoService>();
+builder.Services.AddSingleton(builder.Configuration.GetSection("Reposicao").Get<ReposicaoOptions>() ?? new ReposicaoOptions());
+builder.Services.AddSingleton(builder.Configuration.GetSection("Pix").Get<PixOptions>() ?? new PixOptions());
+builder.Services.AddSingleton<PixService>();
 builder.Services.AddSingleton<ExportacaoRelatorioService>();
 
 // Fotos dos produtos: em disco (wwwroot/uploads/produtos) ou na pasta definida em "Fotos:Pasta".

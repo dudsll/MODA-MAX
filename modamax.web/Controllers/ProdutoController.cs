@@ -14,11 +14,13 @@ public class ProdutoController : Controller
 
     private readonly AppDbContext _context;
     private readonly IArmazenamentoFotos _fotos;
+    private readonly ReposicaoService _reposicao;
 
-    public ProdutoController(AppDbContext context, IArmazenamentoFotos fotos)
+    public ProdutoController(AppDbContext context, IArmazenamentoFotos fotos, ReposicaoService reposicao)
     {
         _context = context;
         _fotos = fotos;
+        _reposicao = reposicao;
     }
 
     [RequireUser("Estrategico", "Tatico", "Operacional")]
@@ -81,6 +83,13 @@ public class ProdutoController : Controller
             return NotFound();
         }
 
+        // Linha do tempo das ultimas entradas e saidas e a previsao de reposicao do produto.
+        ViewBag.Movimentacoes = await _context.MovimentacoesEstoque.AsNoTracking()
+            .Where(m => m.IdProduto == produto.IdProduto)
+            .OrderByDescending(m => m.Data)
+            .Take(8)
+            .ToListAsync();
+        ViewBag.Reposicao = (await _reposicao.CalcularAsync()).FirstOrDefault(s => s.IdProduto == produto.IdProduto);
         return View(produto);
     }
 
