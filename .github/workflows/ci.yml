@@ -22,6 +22,11 @@ jobs:
         run: dotnet build modamax.web/modamax.web.csproj -c Release --no-restore
       - name: Testes automatizados
         run: dotnet test tests/ModaMax.Tests -c Release --logger "console;verbosity=normal"
+      - name: Testes de integracao (SQL Server em container)
+        run: dotnet test tests/ModaMax.IntegrationTests -c Release --logger "console;verbosity=normal"
+        env:
+          # Obriga a execucao: sem Docker o teste falha em vez de ser ignorado.
+          MODAMAX_TESTES_SQLSERVER: "1"
       - name: Gerar script do banco a partir das migrations
         run: |
           dotnet tool install --global dotnet-ef

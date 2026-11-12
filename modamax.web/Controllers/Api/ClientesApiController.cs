@@ -75,7 +75,7 @@ public class ClientesApiController : ControllerBase
 
         if (await _context.Pedidos.AnyAsync(p => p.IdCliente == id))
         {
-            return Conflict(new { mensagem = "Cliente possui pedidos e nao pode ser excluido." });
+            return Problem(detail: "Cliente possui pedidos e nao pode ser excluido.", statusCode: StatusCodes.Status409Conflict);
         }
 
         _context.Clientes.Remove(cliente);

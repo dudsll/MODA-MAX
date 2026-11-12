@@ -1,8 +1,51 @@
+@using modamax.web.Services
 @model IEnumerable<modamax.web.Models.Pedido>
-@{ ViewData["Title"] = "Pedidos"; }
-<div class="page-header"><div><p class="section-kicker">Vendas</p><h1>Pedidos</h1><p class="page-copy">Cadastre pedidos com impacto direto no estoque.</p></div><a class="btn btn-primary" asp-action="Create">Novo pedido</a></div>
-<div class="content-card"><div class="table-responsive"><table class="table table-modern"><thead><tr><th>Pedido</th><th>Cliente</th><th>Data</th><th>Status</th><th>Tipo</th><th>Valor</th><th class="text-end">Ações</th></tr></thead><tbody>
-@foreach (var item in Model) {
-<tr><td>#@item.IdPedido</td><td>@item.Cliente?.Nome</td><td>@item.DataPedido.ToString("dd/MM/yyyy")</td><td>@item.Status</td><td>@item.TiposVenda</td><td>@item.ValorTotal.ToString("C")</td><td class="text-end"><a asp-action="Edit" asp-route-id="@item.IdPedido">Editar</a> | <a asp-action="Details" asp-route-id="@item.IdPedido">Detalhes</a> | <a asp-action="Delete" asp-route-id="@item.IdPedido">Excluir</a></td></tr>
+@{
+    ViewData["Title"] = "Pedidos";
+    string ClasseStatus(string status) => status switch { "Finalizado" => "status-verde", "Cancelado" => "status-vermelho", _ => "status-laranja" };
+    string ClassePagamento(string status) => status switch { Pagamentos.Pago => "status-verde", Pagamentos.Estornado => "status-roxo", _ => "status-laranja" };
 }
-</tbody></table></div></div>
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Vendas</p>
+        <h1>Pedidos</h1>
+        <p class="page-copy">Todos os pedidos de varejo e atacado, com a situação da entrega e do pagamento.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">
+        <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-plus" /></svg>Novo pedido
+    </a>
+</div>
+
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="table table-modern">
+            <thead>
+                <tr><th>Pedido</th><th>Cliente</th><th>Data</th><th>Status</th><th>Pagamento</th><th class="text-end">Valor</th><th class="text-end"><span class="visually-hidden">Ações</span></th></tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td><a asp-action="Details" asp-route-id="@item.IdPedido"><strong>#@item.IdPedido</strong></a></td>
+                    <td>@item.Cliente?.Nome<small class="d-block text-muted">@item.TiposVenda · @item.Itens.Sum(i => i.Quantidade) peça(s)</small></td>
+                    <td class="text-nowrap">@item.DataPedido.ToString("dd/MM/yyyy")</td>
+                    <td><span class="status @ClasseStatus(item.Status)">@item.Status</span></td>
+                    <td>
+                        <span class="status @ClassePagamento(item.StatusPagamento)">@item.StatusPagamento</span>
+                        <small class="d-block text-muted mt-1">@Pagamentos.Nome(item.FormaPagamento)@(item.Parcelas > 1 ? $" · {item.Parcelas}x" : "")</small>
+                    </td>
+                    <td class="text-end"><strong>@item.ValorTotal.ToString("C")</strong></td>
+                    <td class="text-end">
+                        <span class="acoes-linha">
+                            <a asp-action="Details" asp-route-id="@item.IdPedido" aria-label="Detalhes do pedido @item.IdPedido" title="Detalhes"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-eye" /></svg></a>
+                            <a asp-action="Edit" asp-route-id="@item.IdPedido" aria-label="Editar pedido @item.IdPedido" title="Editar"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-pencil" /></svg></a>
+                            <a class="perigo" asp-action="Delete" asp-route-id="@item.IdPedido" aria-label="Excluir pedido @item.IdPedido" title="Excluir"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-trash-2" /></svg></a>
+                        </span>
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

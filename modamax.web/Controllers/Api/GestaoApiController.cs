@@ -15,11 +15,35 @@ public class GestaoApiController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly DashboardService _dashboardService;
+    private readonly MetaService _metas;
+    private readonly ReposicaoService _reposicao;
 
-    public GestaoApiController(AppDbContext context, DashboardService dashboardService)
+    public GestaoApiController(AppDbContext context, DashboardService dashboardService, MetaService metas, ReposicaoService reposicao)
     {
         _context = context;
         _dashboardService = dashboardService;
+        _metas = metas;
+        _reposicao = reposicao;
+    }
+
+    // GET /api/metas/atual  (aneis de meta do mes no app)
+    [HttpGet("metas/atual")]
+    public async Task<ActionResult<MetaDto>> MetaAtual()
+    {
+        var p = await _metas.ProgressoAsync();
+        static IndicadorMetaDto Indicador(IndicadorMeta i) => new(i.Meta, i.Realizado, i.Percentual);
+        return new MetaDto(p.NomeMes, p.Definida, Indicador(p.Faturamento), Indicador(p.Pedidos), Indicador(p.Pecas),
+            p.ProjecaoFaturamento, p.DiasRestantes);
+    }
+
+    // GET /api/reposicao  (central de reposicao: criticos primeiro)
+    [HttpGet("reposicao")]
+    public async Task<ActionResult<IEnumerable<ReposicaoDto>>> Reposicao()
+    {
+        return (await _reposicao.CalcularAsync())
+            .Select(s => new ReposicaoDto(s.IdProduto, s.Produto, s.Categoria, s.FotoUrl, s.Estoque, s.VendidosNoPeriodo,
+                s.DiasDeCobertura, s.QuantidadeSugerida, s.Situacao.ToString()))
+            .ToList();
     }
 
     // GET /api/categorias
@@ -42,7 +66,7 @@ public class GestaoApiController : ControllerBase
             await _context.Clientes.CountAsync(),
             await _context.Pedidos.CountAsync(),
             (await _context.Pedidos.Where(p => p.Status != "Cancelado").Select(p => p.ValorTotal).ToListAsync()).Sum(),
-            await _context.Produtos.CountAsync(p => p.Estoque <= 15));
+            (await _reposicao.CalcularAsync()).Count(s => s.Situacao != SituacaoReposicao.Ok));
     }
 
     // GET /api/dashboard/graficos  (mesmos dados dos graficos do painel Web)

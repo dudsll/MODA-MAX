@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../widgets/comum.dart';
+import 'leitor_screen.dart';
 
 /// Registro de pedido pelo app: escolhe cliente, tipo de venda e itens.
 /// A API valida estoque, aplica 10% de desconto no atacado e da baixa no estoque.
@@ -18,6 +19,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
 
   Cliente? _cliente;
   String _tipoVenda = 'Varejo';
+  String _formaPagamento = 'Pix';
+  int _parcelas = 1;
   final List<ItemCarrinho> _itens = [];
   bool _enviando = false;
 
@@ -53,7 +56,24 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
       ),
     );
     if (produto == null) return;
+    _adicionarAoCarrinho(produto);
+  }
 
+  /// Le a etiqueta e coloca o produto no carrinho; ler de novo aumenta a quantidade.
+  Future<void> _lerCodigo(List<Produto> produtos) async {
+    final codigo = await LeitorCodigoScreen.abrir(context, titulo: 'Adicionar pelo código');
+    if (codigo == null || !mounted) return;
+
+    final produto = produtos.where((p) => p.codigoBarras == codigo).firstOrNull;
+    if (produto == null) {
+      mostrarMensagem(context, 'Nenhum produto disponível com o código $codigo.');
+      return;
+    }
+    _adicionarAoCarrinho(produto);
+    mostrarMensagem(context, '${produto.nome} adicionado.');
+  }
+
+  void _adicionarAoCarrinho(Produto produto) {
     setState(() {
       final existente = _itens.where((i) => i.produto.idProduto == produto.idProduto).firstOrNull;
       if (existente != null) {
@@ -80,6 +100,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
         idCliente: _cliente!.idCliente,
         tipoVenda: _tipoVenda,
         itens: _itens,
+        formaPagamento: _formaPagamento,
+        parcelas: _formaPagamento == 'Credito' ? _parcelas : 1,
       );
       if (!mounted) return;
       mostrarMensagem(context, 'Pedido #${pedido.idPedido} registrado.');
@@ -125,9 +147,39 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                 onSelectionChanged: (s) => setState(() => _tipoVenda = s.first),
               ),
               const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _formaPagamento,
+                decoration: const InputDecoration(labelText: 'Forma de pagamento'),
+                items: [
+                  for (final forma in formasPagamento.entries) DropdownMenuItem(value: forma.key, child: Text(forma.value)),
+                ],
+                onChanged: (f) => setState(() {
+                  _formaPagamento = f ?? 'Pix';
+                  if (_formaPagamento != 'Credito') _parcelas = 1;
+                }),
+              ),
+              // Parcelamento so no cartao de credito, de 1 a 6 vezes (mesma regra da API).
+              if (_formaPagamento == 'Credito') ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  value: _parcelas,
+                  decoration: const InputDecoration(labelText: 'Parcelas'),
+                  items: [
+                    for (var n = 1; n <= maxParcelas; n++)
+                      DropdownMenuItem(value: n, child: Text(n == 1 ? 'À vista' : '${n}x de ${formatarMoeda(_total / n)}')),
+                  ],
+                  onChanged: (n) => setState(() => _parcelas = n ?? 1),
+                ),
+              ],
+              const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(child: Text('Itens', style: Theme.of(context).textTheme.titleMedium)),
+                  IconButton(
+                    tooltip: 'Adicionar pelo código de barras',
+                    onPressed: () => _lerCodigo(produtos),
+                    icon: const Icon(Icons.qr_code_scanner),
+                  ),
                   TextButton.icon(
                     onPressed: () => _adicionarProduto(produtos),
                     icon: const Icon(Icons.add),

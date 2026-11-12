@@ -12,11 +12,13 @@ public class PedidoController : Controller
 {
     private readonly AppDbContext _context;
     private readonly PedidoService _pedidoService;
+    private readonly PixService _pix;
 
-    public PedidoController(AppDbContext context, PedidoService pedidoService)
+    public PedidoController(AppDbContext context, PedidoService pedidoService, PixService pix)
     {
         _context = context;
         _pedidoService = pedidoService;
+        _pix = pix;
     }
 
     public async Task<IActionResult> Index()
@@ -41,7 +43,36 @@ public class PedidoController : Controller
             .ThenInclude(i => i.Produto)
             .FirstOrDefaultAsync(p => p.IdPedido == id);
 
-        return pedido == null ? NotFound() : View(pedido);
+        if (pedido == null) return NotFound();
+
+        // PIX pendente: mostra o QR Code e o "copia e cola" com o valor do pedido.
+        if (pedido.FormaPagamento == "Pix" && pedido.StatusPagamento == Pagamentos.Pendente && pedido.Status != PedidoService.StatusCancelado)
+        {
+            var payload = _pix.GerarPayload(pedido.ValorTotal, $"PEDIDO{pedido.IdPedido}");
+            ViewBag.PixPayload = payload;
+            ViewBag.PixSvg = PixService.GerarQrCodeSvg(payload);
+        }
+
+        return View(pedido);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ConfirmarPagamento(int id)
+    {
+        var resultado = await _pedidoService.ConfirmarPagamentoAsync(id);
+        if (resultado.NaoEncontrado) return NotFound();
+        if (resultado.Sucesso)
+        {
+            await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Pagamento do pedido #{id} confirmado.");
+            TempData["Mensagem"] = $"Pagamento do pedido #{id} confirmado.";
+        }
+        else
+        {
+            TempData["Erro"] = resultado.Erro;
+        }
+
+        return RedirectToAction(nameof(Details), new { id });
     }
 
     public async Task<IActionResult> Create()
@@ -90,6 +121,8 @@ public class PedidoController : Controller
             DataPedido = pedido.DataPedido,
             TiposVenda = pedido.TiposVenda,
             Status = pedido.Status,
+            FormaPagamento = pedido.FormaPagamento,
+            Parcelas = pedido.Parcelas,
             ValorTotal = pedido.ValorTotal,
             Itens = pedido.Itens
                 .Select(i => new PedidoItemFormViewModel { IdProduto = i.IdProduto, Quantidade = i.Quantidade, Desconto = i.Desconto })
@@ -203,6 +236,9 @@ public class PedidoController : Controller
         DataPedido = viewModel.DataPedido,
         TiposVenda = viewModel.TiposVenda,
         Status = viewModel.Status,
+        FormaPagamento = viewModel.FormaPagamento,
+        // Parcelamento so vale no credito; nas outras formas o campo e ignorado.
+        Parcelas = viewModel.FormaPagamento == "Credito" ? viewModel.Parcelas : 1,
         Itens = viewModel.Itens
             .Select(i => new ItemPedidoEntrada { IdProduto = i.IdProduto, Quantidade = i.Quantidade, Desconto = i.Desconto })
             .ToList()

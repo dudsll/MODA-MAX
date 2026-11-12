@@ -1,0 +1,20 @@
+{
+  "name": "ModaMax – Gestão comercial",
+  "short_name": "ModaMax",
+  "description": "Vendas, estoque e clientes da ModaMax em um só lugar.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f7",
+  "theme_color": "#0b2f73",
+  "icons": [
+    { "src": "/img/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/img/icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/img/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Novo pedido", "url": "/Pedido/Create" },
+    { "name": "Reposição", "url": "/Reposicao" }
+  ]
+}

@@ -125,7 +125,7 @@ CREATE INDEX [IX_Produto_IdFornecedor] ON [Produto] ([IdFornecedor]);
 CREATE UNIQUE INDEX [IX_Usuario_Email] ON [Usuario] ([Email]);
 
 INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20261030025741_EstruturaInicialSqlServer', N'10.0.14');
+VALUES (N'20261030025741_EstruturaInicialSqlServer', N'10.0.15');
 
 COMMIT;
 GO
@@ -242,7 +242,7 @@ END
 GO
 
 INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20261030025750_ProceduresETriggers', N'10.0.14');
+VALUES (N'20261030025750_ProceduresETriggers', N'10.0.15');
 GO
 
 BEGIN TRANSACTION;
@@ -262,7 +262,55 @@ CREATE INDEX [IX_RecuperacaoSenha_IdUsuario] ON [RecuperacaoSenha] ([IdUsuario])
 CREATE UNIQUE INDEX [IX_RecuperacaoSenha_TokenHash] ON [RecuperacaoSenha] ([TokenHash]);
 
 INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
-VALUES (N'20261031213905_RecuperacaoSenha', N'10.0.14');
+VALUES (N'20261031213905_RecuperacaoSenha', N'10.0.15');
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+ALTER TABLE [Usuario] ADD [BloqueadoAte] datetime2 NULL;
+
+ALTER TABLE [Usuario] ADD [TentativasFalhas] int NOT NULL DEFAULT 0;
+
+ALTER TABLE [Produto] ADD [CodigoBarras] nvarchar(14) NULL;
+
+ALTER TABLE [Produto] ADD [FotoUrl] nvarchar(300) NULL;
+
+CREATE UNIQUE INDEX [IX_Produto_CodigoBarras] ON [Produto] ([CodigoBarras]) WHERE [CodigoBarras] IS NOT NULL;
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20261103162233_FotosCodigoBarrasBloqueioLogin', N'10.0.15');
+
+COMMIT;
+GO
+
+BEGIN TRANSACTION;
+ALTER TABLE [Pedido] ADD [FormaPagamento] nvarchar(20) NOT NULL DEFAULT N'Pix';
+
+ALTER TABLE [Pedido] ADD [PagoEm] datetime2 NULL;
+
+ALTER TABLE [Pedido] ADD [Parcelas] int NOT NULL DEFAULT 1;
+
+ALTER TABLE [Pedido] ADD [StatusPagamento] nvarchar(20) NOT NULL DEFAULT N'Pendente';
+
+EXEC('UPDATE Pedido SET StatusPagamento = ''Pago'', PagoEm = DataPedido WHERE Status = ''Finalizado'';');
+
+CREATE TABLE [Meta] (
+    [IdMeta] int NOT NULL IDENTITY,
+    [Ano] int NOT NULL,
+    [Mes] int NOT NULL,
+    [Faturamento] decimal(12,2) NOT NULL,
+    [Pedidos] int NOT NULL,
+    [Pecas] int NOT NULL,
+    CONSTRAINT [PK_Meta] PRIMARY KEY ([IdMeta])
+);
+
+ALTER TABLE [Pedido] ADD CONSTRAINT [CK_Pedido_Parcelas] CHECK ([Parcelas] BETWEEN 1 AND 6);
+
+CREATE UNIQUE INDEX [IX_Meta_Ano_Mes] ON [Meta] ([Ano], [Mes]);
+
+INSERT INTO [__EFMigrationsHistory] ([MigrationId], [ProductVersion])
+VALUES (N'20261112020949_MetasEPagamentos', N'10.0.15');
 
 COMMIT;
 GO

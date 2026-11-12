@@ -56,6 +56,25 @@
                 <option>Cancelado</option>
             </select>
         </div>
+        <div class="col-md-6">
+            <label asp-for="FormaPagamento" class="form-label"></label>
+            <select asp-for="FormaPagamento" class="form-select" id="forma-pagamento">
+                @foreach (var forma in modamax.web.Services.Pagamentos.Formas)
+                {
+                    <option value="@forma.Key">@forma.Value</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-6">
+            <label asp-for="Parcelas" class="form-label"></label>
+            <select asp-for="Parcelas" class="form-select" id="parcelas">
+                @for (var n = 1; n <= modamax.web.Services.Pagamentos.MaxParcelas; n++)
+                {
+                    <option value="@n">@(n == 1 ? "À vista" : $"{n}x sem juros")</option>
+                }
+            </select>
+            <div class="form-text" id="valor-parcela">Parcelamento disponível só no cartão de crédito.</div>
+        </div>
     </div>
 
     <div class="section-heading mt-4">
@@ -151,7 +170,10 @@
                 linha.querySelector('.campo-subtotal').textContent = moeda.format(subtotal);
                 total += subtotal;
             });
-            document.getElementById('total-pedido').textContent = moeda.format(total);
+            const campoTotal = document.getElementById('total-pedido');
+            campoTotal.textContent = moeda.format(total);
+            campoTotal.dataset.valor = total;
+            if (typeof atualizarPagamento === 'function') atualizarPagamento();
         }
 
         document.getElementById('adicionar-item').addEventListener('click', () => {
@@ -168,11 +190,30 @@
             recalcular();
         });
 
+        // Parcelas so no cartao de credito; mostra o valor de cada parcela.
+        const forma = document.getElementById('forma-pagamento');
+        const parcelas = document.getElementById('parcelas');
+        const textoParcela = document.getElementById('valor-parcela');
+        function atualizarPagamento() {
+            const credito = forma.value === 'Credito';
+            parcelas.disabled = !credito;
+            if (!credito) parcelas.value = '1';
+            const total = parseFloat(document.getElementById('total-pedido').dataset.valor || '0');
+            const n = parseInt(parcelas.value, 10) || 1;
+            textoParcela.textContent = credito
+                ? (n > 1 ? `${n}x de ${moeda.format(total / n)}` : 'Pagamento à vista no crédito.')
+                : 'Parcelamento disponível só no cartão de crédito.';
+        }
+        forma.addEventListener('change', atualizarPagamento);
+        parcelas.addEventListener('change', atualizarPagamento);
+        document.getElementById('form-pedido').addEventListener('submit', () => { parcelas.disabled = false; });
+
         corpo.addEventListener('input', recalcular);
         corpo.addEventListener('change', recalcular);
         tipoVenda.addEventListener('change', recalcular);
 
         reindexar();
         recalcular();
+        atualizarPagamento();
     })();
 </script>

@@ -40,6 +40,10 @@ class Produto {
   final int estoque;
   final String? categoria;
   final String? fornecedor;
+  final String? codigoBarras;
+
+  /// Caminho da foto na API (ex.: /uploads/produtos/abc.jpg) ou null se nao houver foto.
+  final String? fotoUrl;
 
   Produto({
     required this.idProduto,
@@ -51,7 +55,17 @@ class Produto {
     required this.estoque,
     this.categoria,
     this.fornecedor,
+    this.codigoBarras,
+    this.fotoUrl,
   });
+
+  /// Endereco completo da foto, juntando o servidor da API com o caminho devolvido por ela.
+  String? enderecoFoto(String servidor) {
+    final foto = fotoUrl;
+    if (foto == null || foto.isEmpty) return null;
+    if (foto.startsWith('http://') || foto.startsWith('https://')) return foto;
+    return '$servidor$foto';
+  }
 
   factory Produto.fromJson(Map<String, dynamic> json) => Produto(
         idProduto: json['idProduto'] as int,
@@ -63,6 +77,8 @@ class Produto {
         estoque: json['estoque'] as int,
         categoria: json['categoria'] as String?,
         fornecedor: json['fornecedor'] as String?,
+        codigoBarras: json['codigoBarras'] as String?,
+        fotoUrl: json['fotoUrl'] as String?,
       );
 }
 
@@ -150,6 +166,9 @@ class Pedido {
   final String status;
   final double valorTotal;
   final List<ItemPedido> itens;
+  final String formaPagamento;
+  final int parcelas;
+  final String statusPagamento;
 
   Pedido({
     required this.idPedido,
@@ -160,7 +179,12 @@ class Pedido {
     required this.status,
     required this.valorTotal,
     required this.itens,
+    this.formaPagamento = 'Pix',
+    this.parcelas = 1,
+    this.statusPagamento = 'Pendente',
   });
+
+  bool get pagamentoPendente => statusPagamento == 'Pendente' && status != 'Cancelado';
 
   factory Pedido.fromJson(Map<String, dynamic> json) => Pedido(
         idPedido: json['idPedido'] as int,
@@ -173,6 +197,104 @@ class Pedido {
         itens: (json['itens'] as List<dynamic>)
             .map((i) => ItemPedido.fromJson(i as Map<String, dynamic>))
             .toList(),
+        // Valores padrao para dados salvos no cache antes da versao com pagamentos.
+        formaPagamento: json['formaPagamento'] as String? ?? 'Pix',
+        parcelas: json['parcelas'] as int? ?? 1,
+        statusPagamento: json['statusPagamento'] as String? ?? 'Pendente',
+      );
+}
+
+/// Formas de pagamento aceitas pela API (codigo -> nome exibido).
+const formasPagamento = {
+  'Pix': 'PIX',
+  'Credito': 'Cartão de crédito',
+  'Debito': 'Cartão de débito',
+  'Boleto': 'Boleto',
+  'Dinheiro': 'Dinheiro',
+};
+
+const maxParcelas = 6;
+
+String nomePagamento(String forma) => formasPagamento[forma] ?? forma;
+
+class IndicadorMeta {
+  final double meta;
+  final double realizado;
+  final int percentual;
+
+  IndicadorMeta({required this.meta, required this.realizado, required this.percentual});
+
+  factory IndicadorMeta.fromJson(Map<String, dynamic> json) => IndicadorMeta(
+        meta: _decimal(json['meta']),
+        realizado: _decimal(json['realizado']),
+        percentual: json['percentual'] as int,
+      );
+}
+
+/// Progresso das metas do mes (GET /api/metas/atual).
+class MetaAtual {
+  final String mes;
+  final bool definida;
+  final IndicadorMeta faturamento;
+  final IndicadorMeta pedidos;
+  final IndicadorMeta pecas;
+  final double projecaoFaturamento;
+  final int diasRestantes;
+
+  MetaAtual({
+    required this.mes,
+    required this.definida,
+    required this.faturamento,
+    required this.pedidos,
+    required this.pecas,
+    required this.projecaoFaturamento,
+    required this.diasRestantes,
+  });
+
+  factory MetaAtual.fromJson(Map<String, dynamic> json) => MetaAtual(
+        mes: json['mes'] as String,
+        definida: json['definida'] as bool,
+        faturamento: IndicadorMeta.fromJson(json['faturamento'] as Map<String, dynamic>),
+        pedidos: IndicadorMeta.fromJson(json['pedidos'] as Map<String, dynamic>),
+        pecas: IndicadorMeta.fromJson(json['pecas'] as Map<String, dynamic>),
+        projecaoFaturamento: _decimal(json['projecaoFaturamento']),
+        diasRestantes: json['diasRestantes'] as int,
+      );
+}
+
+/// Produto da central de reposicao (GET /api/reposicao).
+class ItemReposicao {
+  final int idProduto;
+  final String produto;
+  final String? categoria;
+  final int estoque;
+  final int vendidosNoPeriodo;
+  final int? diasDeCobertura;
+  final int quantidadeSugerida;
+  final String situacao;
+
+  ItemReposicao({
+    required this.idProduto,
+    required this.produto,
+    this.categoria,
+    required this.estoque,
+    required this.vendidosNoPeriodo,
+    this.diasDeCobertura,
+    required this.quantidadeSugerida,
+    required this.situacao,
+  });
+
+  bool get critico => situacao == 'Critico';
+
+  factory ItemReposicao.fromJson(Map<String, dynamic> json) => ItemReposicao(
+        idProduto: json['idProduto'] as int,
+        produto: json['produto'] as String,
+        categoria: json['categoria'] as String?,
+        estoque: json['estoque'] as int,
+        vendidosNoPeriodo: json['vendidosNoPeriodo'] as int,
+        diasDeCobertura: json['diasDeCobertura'] as int?,
+        quantidadeSugerida: json['quantidadeSugerida'] as int,
+        situacao: json['situacao'] as String,
       );
 }
 

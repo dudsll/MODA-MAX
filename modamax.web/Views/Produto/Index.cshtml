@@ -17,7 +17,7 @@
     <form method="get" class="row g-3 mb-4">
         <div class="col-md-4">
             <label class="form-label">Busca</label>
-            <input type="text" name="busca" value="@ViewBag.Busca" class="form-control" placeholder="Nome ou codigo" />
+            <input type="text" name="busca" value="@ViewBag.Busca" class="form-control" placeholder="Nome, código ou código de barras" />
         </div>
         <div class="col-md-3">
             <label class="form-label">Categoria</label>
@@ -59,15 +59,25 @@
             {
                 <tr>
                     <td>@item.IdProduto</td>
-                    <td>@item.Nome</td>
+                    <td>
+                        <div class="produto-nome">
+                            @if (!string.IsNullOrEmpty(item.FotoUrl))
+                            {
+                                <img class="produto-foto-mini" src="@item.FotoUrl" alt="" loading="lazy" />
+                            }
+                            else
+                            {
+                                <span class="produto-foto-mini produto-sem-foto" aria-hidden="true">@item.Nome[..1]</span>
+                            }
+                            <span>@item.Nome</span>
+                        </div>
+                    </td>
                     <td>@item.Categoria?.Nome</td>
                     <td>@item.Fornecedor?.Nome</td>
                     <td>@item.Preco.ToString("C")</td>
                     <td>@item.Estoque</td>
                     <td class="text-end">
-                        <a asp-action="Edit" asp-route-id="@item.IdProduto">Editar</a> |
-                        <a asp-action="Details" asp-route-id="@item.IdProduto">Detalhes</a> |
-                        <a asp-action="Delete" asp-route-id="@item.IdProduto">Excluir</a>
+                        <span class="acoes-linha"><a asp-action="Details" asp-route-id="@item.IdProduto" aria-label="Detalhes" title="Detalhes"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-eye" /></svg></a><a asp-action="Edit" asp-route-id="@item.IdProduto" aria-label="Editar" title="Editar"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-pencil" /></svg></a><a class="perigo" asp-action="Delete" asp-route-id="@item.IdProduto" aria-label="Excluir" title="Excluir"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-trash-2" /></svg></a></span>
                     </td>
                 </tr>
             }

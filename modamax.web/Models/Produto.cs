@@ -40,6 +40,15 @@ public class Produto
     [Display(Name = "Fornecedor")]
     public int IdFornecedor { get; set; }
 
+    // Codigo GTIN/EAN impresso na etiqueta (8, 12, 13 ou 14 digitos), lido pelo app com a camera.
+    [Display(Name = "Código de barras")]
+    [StringLength(14)]
+    public string? CodigoBarras { get; set; }
+
+    // Endereco publico da foto (ex.: /uploads/produtos/abc.jpg). O arquivo fica no armazenamento de fotos.
+    [StringLength(300)]
+    public string? FotoUrl { get; set; }
+
     public Categoria? Categoria { get; set; }
 
     public Fornecedor? Fornecedor { get; set; }

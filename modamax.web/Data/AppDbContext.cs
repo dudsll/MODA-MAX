@@ -30,6 +30,8 @@ public class AppDbContext : DbContext
 
     public DbSet<RecuperacaoSenha> RecuperacoesSenha => Set<RecuperacaoSenha>();
 
+    public DbSet<Meta> Metas => Set<Meta>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -47,13 +49,24 @@ public class AppDbContext : DbContext
         {
             t.HasTrigger("trg_Pedido_AuditaStatus");
             t.HasCheckConstraint("CK_Pedido_ValorTotal", "[ValorTotal] >= 0");
+            t.HasCheckConstraint("CK_Pedido_Parcelas", "[Parcelas] BETWEEN 1 AND 6");
         });
+
+        // Uma meta por mes.
+        modelBuilder.Entity<Meta>()
+            .HasIndex(m => new { m.Ano, m.Mes })
+            .IsUnique();
 
         modelBuilder.Entity<ItemPedido>().ToTable(t =>
             t.HasCheckConstraint("CK_ItemPedido_Quantidade", "[Quantidade] > 0"));
 
         modelBuilder.Entity<Usuario>()
             .HasIndex(u => u.Email)
+            .IsUnique();
+
+        // Unico apenas entre os produtos que tem codigo (no SQL Server vira indice filtrado IS NOT NULL).
+        modelBuilder.Entity<Produto>()
+            .HasIndex(p => p.CodigoBarras)
             .IsUnique();
 
         modelBuilder.Entity<Pedido>()

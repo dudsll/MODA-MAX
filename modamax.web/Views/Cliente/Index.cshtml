@@ -36,9 +36,7 @@
                     <td>@item.Email</td>
                     <td>@item.Telefone</td>
                     <td class="text-end">
-                        <a asp-action="Edit" asp-route-id="@item.IdCliente">Editar</a> |
-                        <a asp-action="Details" asp-route-id="@item.IdCliente">Detalhes</a> |
-                        <a asp-action="Delete" asp-route-id="@item.IdCliente">Excluir</a>
+                        <span class="acoes-linha"><a asp-action="Details" asp-route-id="@item.IdCliente" aria-label="Detalhes" title="Detalhes"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-eye" /></svg></a><a asp-action="Edit" asp-route-id="@item.IdCliente" aria-label="Editar" title="Editar"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-pencil" /></svg></a><a class="perigo" asp-action="Delete" asp-route-id="@item.IdCliente" aria-label="Excluir" title="Excluir"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-trash-2" /></svg></a></span>
                     </td>
                 </tr>
             }

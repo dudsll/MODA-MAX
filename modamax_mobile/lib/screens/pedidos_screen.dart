@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../services/api_service.dart';
@@ -54,7 +55,8 @@ class _PedidosScreenState extends State<PedidosScreen> {
               ListTile(
                 leading: StatusPedido(status: p.status),
                 title: Text('Pedido #${p.idPedido} - ${p.cliente ?? ''}'),
-                subtitle: Text('${formatarData(p.dataPedido)} - ${p.tiposVenda} - ${p.status}'),
+                subtitle: Text('${formatarData(p.dataPedido)} - ${p.status}\n${nomePagamento(p.formaPagamento)} · ${p.statusPagamento}'),
+                isThreeLine: true,
                 trailing: Text(formatarMoeda(p.valorTotal), style: const TextStyle(fontWeight: FontWeight.bold)),
                 onTap: () => _abrirDetalhe(p),
               ),
@@ -93,6 +95,60 @@ class PedidoDetalheScreen extends StatefulWidget {
 
 class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
   bool _cancelando = false;
+  bool _pagando = false;
+
+  /// Busca o "PIX copia e cola" do pedido na API e oferece copiar para enviar ao cliente.
+  Future<void> _mostrarPix() async {
+    try {
+      final codigo = await ApiService.instancia.pixDoPedido(widget.pedido.idPedido);
+      if (!mounted) return;
+      final copiou = await showModalBottomSheet<bool>(
+        context: context,
+        builder: (folha) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('PIX copia e cola', style: Theme.of(folha).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                Text('Valor: ${formatarMoeda(widget.pedido.valorTotal)}'),
+                const SizedBox(height: 12),
+                SelectableText(codigo, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: codigo));
+                    if (folha.mounted) Navigator.of(folha).pop(true);
+                  },
+                  icon: const Icon(Icons.copy),
+                  label: const Text('Copiar e enviar ao cliente'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+      if (copiou == true && mounted) mostrarMensagem(context, 'Código PIX copiado.');
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.mensagem);
+    }
+  }
+
+  Future<void> _confirmarPagamento() async {
+    setState(() => _pagando = true);
+    try {
+      await ApiService.instancia.confirmarPagamento(widget.pedido.idPedido);
+      if (!mounted) return;
+      mostrarMensagem(context, 'Pagamento confirmado.');
+      Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.mensagem);
+    } finally {
+      if (mounted) setState(() => _pagando = false);
+    }
+  }
 
   Future<void> _cancelar() async {
     final confirmar = await showDialog<bool>(
@@ -150,6 +206,28 @@ class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
             title: const Text('Total'),
             trailing: Text(formatarMoeda(p.valorTotal), style: tema.textTheme.titleLarge),
           ),
+          ListTile(
+            leading: Icon(
+              p.statusPagamento == 'Pago' ? Icons.verified : Icons.schedule,
+              color: p.statusPagamento == 'Pago' ? Colors.green : Colors.orange,
+            ),
+            title: Text('${nomePagamento(p.formaPagamento)}${p.parcelas > 1 ? ' em ${p.parcelas}x de ${formatarMoeda(p.valorTotal / p.parcelas)}' : ''}'),
+            subtitle: Text('Pagamento ${p.statusPagamento.toLowerCase()}'),
+          ),
+          if (p.pagamentoPendente) ...[
+            if (p.formaPagamento == 'Pix')
+              OutlinedButton.icon(
+                onPressed: _mostrarPix,
+                icon: const Icon(Icons.qr_code_2),
+                label: const Text('PIX copia e cola'),
+              ),
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: _pagando ? null : _confirmarPagamento,
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Confirmar pagamento'),
+            ),
+          ],
           // Cancelar e permitido so aos niveis Estrategico e Tatico (mesma regra da API).
           if (p.status != 'Cancelado' && ApiService.instancia.usuario?.nivel != 'Operacional') ...[
             const SizedBox(height: 16),

@@ -1,0 +1,142 @@
+@using modamax.web.Services
+@model List<SugestaoReposicao>
+@{
+    ViewData["Title"] = "Reposição";
+    var opcoes = (ReposicaoOptions)ViewBag.Opcoes;
+    var podeRegistrar = (bool)ViewBag.PodeRegistrar;
+    var criticos = Model.Count(s => s.Situacao == SituacaoReposicao.Critico);
+    var atencao = Model.Count(s => s.Situacao == SituacaoReposicao.Atencao);
+    var pecasSugeridas = Model.Sum(s => s.QuantidadeSugerida);
+}
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Catálogo</p>
+        <h1>Central de reposição</h1>
+        <p class="page-copy">
+            Previsão pelo ritmo de vendas dos últimos @opcoes.DiasAnalise dias: quantos dias o estoque ainda dura e quanto comprar
+            para cobrir @opcoes.DiasCobertura dias além do prazo de entrega de @opcoes.PrazoEntregaDias dias.
+        </p>
+    </div>
+    @if (podeRegistrar)
+    {
+        <div class="header-actions">
+            <a class="btn btn-primary" asp-action="ExportarPedidoCompra">
+                <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-file-spreadsheet" /></svg>Pedido de compra
+            </a>
+        </div>
+    }
+</div>
+
+@if (TempData["Mensagem"] != null)
+{
+    <div class="aviso-flutuante" role="status"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-circle-check" /></svg>@TempData["Mensagem"]</div>
+}
+@if (TempData["Erro"] != null)
+{
+    <div class="alert alert-danger">@TempData["Erro"]</div>
+}
+
+<section class="metrics-grid">
+    <article class="metric-card">
+        <span class="metric-icone" style="background:var(--vermelho-vivo)"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-triangle-alert" /></svg></span>
+        <span class="metric-label">Críticos</span>
+        <strong>@criticos</strong>
+        <span class="variacao neutra">acabam antes da entrega</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-icone" style="background:var(--laranja-vivo)"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-clock" /></svg></span>
+        <span class="metric-label">Atenção</span>
+        <strong>@atencao</strong>
+        <span class="variacao neutra">comprar nas próximas semanas</span>
+    </article>
+    <article class="metric-card">
+        <span class="metric-icone" style="background:var(--verde-vivo)"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-circle-check" /></svg></span>
+        <span class="metric-label">Em dia</span>
+        <strong>@(Model.Count - criticos - atencao)</strong>
+        <span class="variacao neutra">estoque suficiente</span>
+    </article>
+    <article class="metric-card accent-card">
+        <span class="metric-icone"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-truck" /></svg></span>
+        <span class="metric-label">Peças a comprar</span>
+        <strong>@pecasSugeridas</strong>
+        <span class="variacao">sugestão total</span>
+    </article>
+</section>
+
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="table table-modern">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th class="text-end">Estoque</th>
+                    <th class="text-end">Vendidos (@opcoes.DiasAnalise d)</th>
+                    <th style="min-width:180px">Cobertura</th>
+                    <th class="text-end">Sugestão</th>
+                    <th>Situação</th>
+                    @if (podeRegistrar) { <th class="text-end">Registrar entrada</th> }
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var s in Model)
+            {
+                var dias = s.DiasDeCobertura;
+                var largura = dias == null ? 100 : Math.Min(100, dias.Value * 100 / Math.Max(1, opcoes.DiasCobertura + opcoes.PrazoEntregaDias));
+                var cor = s.Situacao switch { SituacaoReposicao.Critico => "var(--vermelho-vivo)", SituacaoReposicao.Atencao => "var(--laranja-vivo)", _ => "var(--verde-vivo)" };
+                <tr>
+                    <td>
+                        <a class="produto-nome" asp-controller="Produto" asp-action="Details" asp-route-id="@s.IdProduto" style="color:inherit">
+                            @if (!string.IsNullOrEmpty(s.FotoUrl))
+                            {
+                                <img class="produto-foto-mini" src="@s.FotoUrl" alt="" loading="lazy" />
+                            }
+                            else
+                            {
+                                <span class="produto-foto-mini produto-sem-foto" aria-hidden="true">@s.Produto[..1]</span>
+                            }
+                            <span>@s.Produto<small class="d-block text-muted">@s.Categoria · @s.Fornecedor</small></span>
+                        </a>
+                    </td>
+                    <td class="text-end">@s.Estoque</td>
+                    <td class="text-end">@s.VendidosNoPeriodo <small class="text-muted">(@s.MediaDiaria.ToString("0.##")/dia)</small></td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="barra flex-grow-1" role="img" aria-label="@(dias == null ? "sem vendas no período" : $"{dias} dias de estoque")">
+                                <span style="width:@largura%; background:@cor"></span>
+                            </div>
+                            <span class="mono" style="min-width:4.5rem; text-align:right">@(dias == null ? "sem giro" : $"{dias} dias")</span>
+                        </div>
+                    </td>
+                    <td class="text-end"><strong>@(s.QuantidadeSugerida > 0 ? s.QuantidadeSugerida.ToString() : "–")</strong></td>
+                    <td>
+                        @switch (s.Situacao)
+                        {
+                            case SituacaoReposicao.Critico:
+                                <span class="status status-vermelho">Crítico</span>
+                                break;
+                            case SituacaoReposicao.Atencao:
+                                <span class="status status-laranja">Atenção</span>
+                                break;
+                            default:
+                                <span class="status status-verde">Em dia</span>
+                                break;
+                        }
+                    </td>
+                    @if (podeRegistrar)
+                    {
+                        <td class="text-end">
+                            <form asp-action="Entrada" method="post" class="d-inline-flex gap-1 justify-content-end">
+                                <input type="hidden" name="idProduto" value="@s.IdProduto" />
+                                <input class="form-control" style="width:5.5rem; min-height:2.1rem" type="number" min="1" name="quantidade"
+                                       value="@(s.QuantidadeSugerida > 0 ? s.QuantidadeSugerida : 10)" aria-label="Quantidade de entrada para @s.Produto" />
+                                <button class="btn btn-sm btn-outline-primary" type="submit">Repor</button>
+                            </form>
+                        </td>
+                    }
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,94 @@
+@model modamax.web.Models.Produto
+@{
+    var editando = Model.IdProduto > 0;
+}
+
+@* Formulario compartilhado entre cadastro e edicao. multipart/form-data permite enviar a foto. *@
+<form asp-action="@(editando ? "Edit" : "Create")" asp-route-id="@(editando ? Model.IdProduto.ToString() : null)"
+      enctype="multipart/form-data" class="row g-3">
+    <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+    <div class="col-md-8">
+        <label asp-for="Nome" class="form-label"></label>
+        <input asp-for="Nome" class="form-control" />
+        <span asp-validation-for="Nome" class="text-danger"></span>
+    </div>
+    <div class="col-md-4">
+        <label asp-for="Preco" class="form-label"></label>
+        <input asp-for="Preco" class="form-control" />
+        <span asp-validation-for="Preco" class="text-danger"></span>
+    </div>
+    <div class="col-12">
+        <label asp-for="Descricao" class="form-label"></label>
+        <textarea asp-for="Descricao" class="form-control" rows="3"></textarea>
+        <span asp-validation-for="Descricao" class="text-danger"></span>
+    </div>
+    <div class="col-md-3">
+        <label asp-for="Tamanho" class="form-label"></label>
+        <input asp-for="Tamanho" class="form-control" />
+        <span asp-validation-for="Tamanho" class="text-danger"></span>
+    </div>
+    <div class="col-md-3">
+        <label asp-for="Cor" class="form-label"></label>
+        <input asp-for="Cor" class="form-control" />
+        <span asp-validation-for="Cor" class="text-danger"></span>
+    </div>
+    <div class="col-md-3">
+        <label asp-for="Estoque" class="form-label"></label>
+        <input asp-for="Estoque" class="form-control" />
+        <span asp-validation-for="Estoque" class="text-danger"></span>
+    </div>
+    <div class="col-md-3">
+        <label asp-for="CodigoBarras" class="form-label"></label>
+        <input asp-for="CodigoBarras" class="form-control" inputmode="numeric" autocomplete="off"
+               placeholder="EAN-13, ex.: 7891234500014" aria-describedby="ajuda-codigo" />
+        <div id="ajuda-codigo" class="form-text">Opcional. Usado pelo leitor do app.</div>
+        <span asp-validation-for="CodigoBarras" class="text-danger"></span>
+    </div>
+    <div class="col-md-6">
+        <label asp-for="IdCategoria" class="form-label"></label>
+        <select asp-for="IdCategoria" asp-items="ViewBag.Categorias" class="form-select"></select>
+        <span asp-validation-for="IdCategoria" class="text-danger"></span>
+    </div>
+    <div class="col-md-6">
+        <label asp-for="IdFornecedor" class="form-label"></label>
+        <select asp-for="IdFornecedor" asp-items="ViewBag.Fornecedores" class="form-select"></select>
+        <span asp-validation-for="IdFornecedor" class="text-danger"></span>
+    </div>
+
+    <div class="col-md-8">
+        <label for="foto" class="form-label">Foto do produto</label>
+        <input id="foto" name="foto" type="file" class="form-control" accept="image/jpeg,image/png,image/webp"
+               aria-describedby="ajuda-foto" />
+        <div id="ajuda-foto" class="form-text">JPG, PNG ou WebP de até 2 MB.</div>
+        @Html.ValidationMessage("Foto", null, new { @class = "text-danger" })
+        @if (!string.IsNullOrEmpty(Model.FotoUrl))
+        {
+            <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" name="removerFoto" value="true" id="remover-foto" />
+                <label class="form-check-label" for="remover-foto">Remover a foto atual</label>
+            </div>
+        }
+    </div>
+    <div class="col-md-4">
+        <img id="previa-foto" class="produto-foto @(string.IsNullOrEmpty(Model.FotoUrl) ? "d-none" : "")"
+             src="@Model.FotoUrl" alt="Foto de @Model.Nome" />
+    </div>
+
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">@(editando ? "Salvar alterações" : "Salvar produto")</button>
+        <a class="btn btn-outline-secondary" asp-action="Index">Cancelar</a>
+    </div>
+</form>
+
+<script>
+    // Mostra a foto escolhida antes de enviar.
+    document.getElementById('foto').addEventListener('change', e => {
+        const arquivo = e.target.files[0];
+        const previa = document.getElementById('previa-foto');
+        if (!arquivo) return;
+        previa.src = URL.createObjectURL(arquivo);
+        previa.alt = 'Prévia da foto escolhida';
+        previa.classList.remove('d-none');
+    });
+</script>

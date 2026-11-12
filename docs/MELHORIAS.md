@@ -10,6 +10,21 @@ Para cada melhoria há o problema que existia, a solução adotada, os arquivos 
 | 3 | Dashboard com gráficos | Web, API e app |
 | 4 | Testes automatizados | Projeto `tests/` e pipeline de CI |
 | 5 | Modo rápido com SQLite | Execução local, sem Docker |
+| 6 | Bloqueio de login e limite de tentativas | Web e API |
+| 7 | Erros padronizados e logs estruturados | API e servidor |
+| 8 | Testes com SQL Server real | `tests/ModaMax.IntegrationTests` e CI |
+| 9 | Fotos e código de barras dos produtos | Web e API |
+| 10 | Leitor de código de barras | App |
+| 11 | Exportação de relatórios em PDF e Excel | Web |
+| 12 | VLibras e ajustes de layout | Web |
+| 13 | Novo design no estilo Apple, com modo escuro | Web e app |
+| 14 | Busca global (⌘K) | Web |
+| 15 | Aplicativo instalável (PWA) | Web |
+| 16 | Metas de vendas com anéis de progresso | Web, API e app |
+| 17 | Pagamentos e PIX no pedido | Web, API e app |
+| 18 | Central de reposição | Web, API e app |
+| 19 | Curva ABC | Web |
+| 20 | Etiquetas com código de barras e histórico do produto | Web |
 
 ---
 
@@ -190,3 +205,179 @@ dotnet run --project modamax.web/modamax.web.csproj --launch-profile sqlite
 - Os gráficos dependem de internet (Chart.js via CDN).
 - Sem SMTP configurado, o e-mail de recuperação não é enviado de verdade; em produção é preciso configurar um servidor de e-mail.
 - O app Flutter não tem testes das telas novas; a validação dele no CI é feita pelo `flutter analyze` e pelo teste existente.
+
+---
+
+# Terceira etapa
+
+## 6. Bloqueio de login e limite de tentativas
+
+**Problema:** era possível testar senhas sem limite, tanto na Web quanto na API.
+
+**Solução:**
+- O `LoginService`, usado pela Web e pela API, conta as senhas erradas seguidas. Na 5ª a conta fica **bloqueada por 15 minutos**; durante o bloqueio nem a senha certa entra. O bloqueio vai para o log de auditoria.
+- Um login certo zera o contador, e redefinir a senha pelo link de recuperação desbloqueia a conta.
+- Cada endereço IP pode tentar login ou recuperação de senha **10 vezes por minuto**; depois disso recebe 429 (*Too Many Requests*).
+- Os valores ficam em `Seguranca` no `appsettings.json`.
+- Novas colunas `TentativasFalhas` e `BloqueadoAte` na tabela `Usuario`.
+
+**Como conferir:** erre a senha de `tatico@modamax.com` cinco vezes; a tela mostra "Conta bloqueada temporariamente".
+
+## 7. Erros padronizados na API e logs estruturados
+
+- Todos os erros da API seguem o padrão **Problem Details** (RFC 9457): `title`, `status`, `detail` e `traceId`, com content-type `application/problem+json`. Antes cada endpoint respondia de um jeito (`{ "mensagem": ... }` ou corpo vazio).
+- As mensagens de validação passaram para o português, e o app lê o campo `detail`.
+- Os logs usam **Serilog**: cada evento guarda seus dados em campos separados, como "Pedido {IdPedido} criado, total {ValorTotal}". Em produção saem em JSON, prontos para o Application Insights. Há também uma linha por requisição com método, caminho, status e tempo. O e-mail digitado em logins recusados não vai para o log (LGPD).
+- Arquivos: `Infraestrutura/ErrosApi.cs`, `Infraestrutura/LimiteRequisicoes.cs`, `Program.cs`.
+
+## 8. Testes com SQL Server real
+
+O projeto `tests/ModaMax.IntegrationTests` usa **Testcontainers** para subir um SQL Server 2022 em Docker, aplicar as migrations e testar o que o SQLite não tem:
+
+- as três procedures (inclusive o erro 50001 da quantidade zero);
+- os dois triggers de auditoria;
+- a restrição `CHECK` de estoque;
+- o índice único do código de barras;
+- as transações do `PedidoService`.
+
+Sem Docker os testes aparecem como ignorados; no CI eles são obrigatórios. Ao final desta etapa, o projeto tinha 72 testes (62 + 10); a quarta etapa elevou o total para 107 (93 + 14).
+
+## 9. Fotos e código de barras dos produtos
+
+- **Foto:** JPG, PNG ou WebP de até 2 MB. O tipo é conferido pelos primeiros bytes do arquivo, e não pela extensão, e o arquivo é gravado com nome aleatório. Aparece na listagem, nos detalhes e no app.
+- **Código de barras:** EAN-8, UPC-A, EAN-13 ou GTIN-14, validado pelo dígito verificador e único por produto. Os produtos de demonstração já têm códigos (ex.: `7891234500014`).
+- O armazenamento usa a interface `IArmazenamentoFotos`: hoje grava em disco (volume `fotos-produtos` no Docker); na nuvem, basta uma implementação com Azure Blob Storage.
+- **API:** `GET /api/produtos/codigo/{codigo}` e `POST /api/produtos/{id}/foto`.
+- **Correções encontradas no caminho:**
+  - o cadastro deixava digitar o ID do produto, o que falhava no SQL Server;
+  - a edição apagaria a foto ao salvar sem enviar outra;
+  - o campo de preço não aceitava vírgula no navegador, embora o sistema mostre "189,90".
+- Migration `FotosCodigoBarrasBloqueioLogin`.
+
+## 10. Leitor de código de barras no app
+
+- Na aba **Produtos**, o botão "Ler código de barras" abre a câmera (pacote `mobile_scanner`). O produto lido aparece numa ficha com foto, preço e estoque. Gerência e diretoria registram a **entrada de mercadoria** ali mesmo, pela procedure `sp_RegistrarEntradaEstoque`.
+- No **Novo pedido**, ler a etiqueta coloca a peça no carrinho; ler de novo aumenta a quantidade.
+- Leituras parciais são descartadas pelo dígito verificador, e o código também pode ser digitado: ajuda quem não consegue mirar a câmera e funciona no emulador.
+- No iOS é preciso adicionar `NSCameraUsageDescription` ao `Info.plist` depois do `flutter create`.
+
+## 11. Exportação de relatórios em PDF e Excel
+
+- A tela de relatórios ganhou indicadores do período (pedidos, peças, faturamento e ticket médio) e os botões **Exportar PDF** e **Exportar Excel**, que respeitam o filtro de datas.
+- O **Excel** (ClosedXML) tem as abas Resumo, Mais vendidos e Vendas por dia, com filtros e formato de moeda.
+- O **PDF** (QuestPDF) tem cabeçalho, quadro-resumo, tabelas e número de página.
+- **Correção:** as vendas por período eram ordenadas pelo texto "dd/MM/yyyy", o que misturava os meses. Agora a ordem é pela data. Datas invertidas no filtro são trocadas.
+
+## 12. VLibras e ajustes de layout
+
+- O tradutor oficial de LIBRAS do Governo Federal (**VLibras**) aparece em todas as páginas, no botão azul à direita. Era uma proposta do PIM III.
+- O painel mostra os cinco indicadores na mesma linha. Antes o faturamento ficava sozinho embaixo, e o menu cabe em uma linha só em telas de notebook.
+- O contêiner Docker passou a rodar com usuário sem privilégios de root.
+- Um pacote indireto com vulnerabilidade alta (`System.Security.Cryptography.Pkcs`) foi fixado na versão corrigida.
+
+---
+
+# Quarta etapa
+
+## 13. Novo design no estilo Apple, com modo escuro
+
+- Design system próprio inspirado nas Human Interface Guidelines da Apple:
+  - fonte do sistema (San Francisco no Mac e no iPhone);
+  - fundo cinza-claro, cartões translúcidos com cantos arredondados e títulos grandes;
+  - botões em formato de pílula e etiquetas de status coloridas;
+  - controles no estilo iOS;
+  - azul "jeans" como cor de destaque.
+- **Barra lateral** no estilo macOS, com ícones, seções, contador de produtos para repor e cartão do usuário. No celular ela vira um menu deslizante.
+- **Modo escuro** completo: segue o sistema e pode ser trocado pelo botão de lua/sol. A escolha fica salva, e os gráficos mudam de cor junto.
+- O Bootstrap foi atualizado para a versão 5.3. Chart.js e os ícones (Lucide, licença ISC) passaram a ser servidos pelo próprio sistema, então a apresentação funciona sem internet. Antes o Chart.js vinha de uma CDN.
+- Telas redesenhadas:
+  - **login:** apresentação e cartão de entrada;
+  - **painel:** saudação, indicadores com variação mensal e anéis de meta;
+  - **listas:** ações em ícones e etiquetas de status;
+  - **detalhes do pedido e do produto.**
+- Arquivos: `wwwroot/css/site.css`, `wwwroot/js/site.js`, `wwwroot/img/icones.svg`, `Views/Shared/_Layout.cshtml`.
+
+## 14. Busca global (⌘K)
+
+- ⌘K (Mac) ou Ctrl+K abre, em qualquer tela, uma busca no estilo Spotlight. Ela procura:
+  - produtos, pelo nome, categoria ou código de barras;
+  - clientes, pelo nome, documento ou e-mail;
+  - pedidos, pelo número ou cliente;
+  - telas.
+- Navegação pelo teclado (setas e Enter), com uma pequena espera para não buscar a cada tecla. A busca ignora maiúsculas e minúsculas no SQL Server e no SQLite.
+- Endpoint `/Busca?q=` (sessão da Web). Arquivo: `Controllers/BuscaController.cs`.
+
+## 15. Aplicativo instalável (PWA)
+
+- Arquivos: manifesto (`manifest.webmanifest`), ícones do app e service worker (`sw.js`).
+- O sistema pode ser instalado no computador ("Instalar ModaMax" no Chrome ou Edge) e no iPhone ("Adicionar à Tela de Início"), com atalhos para "Novo pedido" e "Reposição".
+- Os arquivos visuais ficam em cache. Os dados sempre vêm do servidor, e sem internet aparece uma página offline.
+
+## 16. Metas de vendas com anéis de progresso
+
+- **Tabela nova `Meta`:** uma linha por mês, com faturamento, pedidos e peças. O índice único em (Ano, Mes) impede duas metas para o mesmo mês.
+- **Tela Metas:**
+  - três anéis no estilo do app Atividade do Apple Watch, com o percentual de cada meta;
+  - projeção de fechamento pelo ritmo atual e quanto é preciso vender por dia;
+  - histórico dos últimos meses, mostrando quais metas foram batidas.
+- **Sugestão automática:** sem meta cadastrada, o sistema sugere a média dos três meses anteriores com 10% de crescimento. Só o nível Estratégico define metas, e a definição vai para a auditoria.
+- **Painel e app:** os anéis aparecem no painel da Web e no app (`GET /api/metas/atual`). No app, eles são desenhados com `CustomPainter`, sem pacotes extras.
+
+## 17. Pagamentos e PIX no pedido
+
+- **Formas de pagamento:** PIX, cartão de crédito (até 6x), débito, boleto ou dinheiro. Só o crédito pode ser parcelado. A regra é a mesma na Web, na API e no app, e o banco também a garante (`CK_Pedido_Parcelas`).
+- **Situação do pagamento:** Pendente, Pago (com data) ou Estornado. Cancelar um pedido já pago muda o pagamento para Estornado.
+- **PIX:**
+  - o "copia e cola" segue o padrão BR Code do Banco Central (EMV), com verificação CRC16-CCITT;
+  - o QR Code é gerado com QRCoder;
+  - a chave é de demonstração, porque a empresa é fictícia, e pode ser trocada em `Pix:Chave`.
+- **Botão "Confirmar pagamento"** na Web e no app.
+- **Painel:** mostra o total a receber.
+- **API:**
+  - `formaPagamento` e `parcelas` em `POST /api/pedidos`;
+  - `PUT /api/pedidos/{id}/pagamento`;
+  - `GET /api/pedidos/{id}/pix`.
+- **Migration `MetasEPagamentos`:** os pedidos finalizados que já existiam passam a constar como pagos.
+
+## 18. Central de reposição
+
+- **Previsão para cada produto:**
+  - ritmo de vendas (média dos últimos 30 dias);
+  - quantos dias o estoque ainda dura;
+  - quanto comprar para cobrir o prazo de entrega mais 30 dias de vendas.
+- **Classificação:** cada produto fica como Crítico, Atenção ou Em dia.
+- **Entrada de mercadoria:** feita direto na central. No SQL Server ela usa a procedure `sp_RegistrarEntradaEstoque`; no modo SQLite, a mesma regra em transação. Antes a entrada só funcionava no SQL Server.
+- **Pedido de compra:** exportado em Excel, com uma aba por fornecedor.
+- **Contador no menu e previsão no app:** o menu lateral mostra quantos produtos precisam de reposição, e o app recebe a mesma previsão (`GET /api/reposicao`).
+
+## 19. Curva ABC
+
+- **Classificação de Pareto:** os produtos são ordenados pelo faturamento e classificados como A (até 80% do acumulado), B (até 95%) ou C (o restante, inclusive quem não vendeu).
+- **Tela:** resumo por classe, gráfico de Pareto (barras de faturamento e linha do acumulado), filtro de período e exportação em Excel.
+
+## 20. Etiquetas com código de barras e histórico do produto
+
+- **Etiquetas:** a tela gera etiquetas com nome, tamanho, cor, preço e o código de barras EAN-13 desenhado em SVG pelo próprio sistema, que implementa a codificação EAN-13. Dá para imprimir por categoria e escolher o número de cópias, e o app lê essas etiquetas com a câmera.
+- **Detalhes do produto:**
+  - código de barras desenhado;
+  - preço de atacado;
+  - previsão de reposição;
+  - linha do tempo das últimas entradas e saídas de estoque.
+
+## Testes da quarta etapa
+
+- **93 testes de regras e da API.** Os novos cobrem:
+  - PIX: CRC16 e campos do BR Code;
+  - regras de pagamento, confirmação e estorno;
+  - desenho do EAN-13;
+  - cálculo da reposição e entrada de estoque no SQLite;
+  - metas, sugestão e projeção;
+  - Curva ABC;
+  - endpoints novos e arquivos do PWA.
+- **14 testes com SQL Server real.** Os novos cobrem:
+  - `CHECK` de parcelas;
+  - meta única por mês;
+  - entrada de estoque pela procedure;
+  - metas e Curva ABC no SQL Server.
+- **Verificação no navegador:** busca, pedido parcelado com confirmação de pagamento, entrada pela central, metas, exportações, etiquetas, modo escuro, PWA e layout no celular.
+

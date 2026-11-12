@@ -22,6 +22,12 @@ public class PedidoFormViewModel
     [Required]
     public string Status { get; set; } = "Finalizado";
 
+    [Display(Name = "Forma de pagamento")]
+    public string FormaPagamento { get; set; } = "Pix";
+
+    [Range(1, 6, ErrorMessage = "Parcelas de 1 a 6.")]
+    public int Parcelas { get; set; } = 1;
+
     public List<PedidoItemFormViewModel> Itens { get; set; } = new();
 
     public decimal ValorTotal { get; set; }

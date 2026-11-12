@@ -101,16 +101,54 @@ class ApiService {
   Future<Pedido> pedido(int id) async =>
       Pedido.fromJson(await _enviar('GET', '/api/pedidos/$id') as Map<String, dynamic>);
 
-  Future<Pedido> criarPedido({required int idCliente, required String tipoVenda, required List<ItemCarrinho> itens}) async {
+  Future<Pedido> criarPedido({
+    required int idCliente,
+    required String tipoVenda,
+    required List<ItemCarrinho> itens,
+    String formaPagamento = 'Pix',
+    int parcelas = 1,
+  }) async {
     final json = await _enviar('POST', '/api/pedidos', corpo: {
       'idCliente': idCliente,
       'tiposVenda': tipoVenda,
+      'formaPagamento': formaPagamento,
+      'parcelas': parcelas,
       'itens': itens.map((i) => i.toJson()).toList(),
     });
     return Pedido.fromJson(json as Map<String, dynamic>);
   }
 
   Future<void> cancelarPedido(int id) => _enviar('PUT', '/api/pedidos/$id/cancelar');
+
+  Future<void> confirmarPagamento(int id) => _enviar('PUT', '/api/pedidos/$id/pagamento');
+
+  /// "PIX copia e cola" do pedido para enviar ao cliente.
+  Future<String> pixDoPedido(int id) async =>
+      ((await _enviar('GET', '/api/pedidos/$id/pix')) as Map<String, dynamic>)['copiaECola'] as String;
+
+  Future<Dados<MetaAtual>> metaAtual() => _lerComCache(
+        '/api/metas/atual',
+        (json) => MetaAtual.fromJson(json as Map<String, dynamic>),
+      );
+
+  Future<Dados<List<ItemReposicao>>> reposicao() => _lerComCache(
+        '/api/reposicao',
+        (json) => (json as List).map((r) => ItemReposicao.fromJson(r as Map<String, dynamic>)).toList(),
+      );
+
+  /// Busca o produto pelo codigo de barras lido na camera (sem cache: o estoque precisa ser o atual).
+  Future<Produto> produtoPorCodigo(String codigo) async => Produto.fromJson(
+      await _enviar('GET', '/api/produtos/codigo/${Uri.encodeComponent(codigo)}') as Map<String, dynamic>);
+
+  /// Registra entrada de mercadoria e devolve o novo estoque (somente Estrategico e Tatico).
+  Future<int> entradaEstoque(int idProduto, int quantidade, {String? observacao}) async {
+    final json = await _enviar('POST', '/api/produtos/$idProduto/entrada-estoque',
+        corpo: {'quantidade': quantidade, 'observacao': observacao});
+    return (json as Map<String, dynamic>)['estoque'] as int;
+  }
+
+  /// Gerentes e diretoria podem dar entrada no estoque e cancelar pedidos.
+  bool get podeGerenciarEstoque => usuario != null && usuario!.nivel != 'Operacional';
 
   Future<Cliente> salvarCliente(Map<String, dynamic> corpo, {int? id}) async {
     if (id == null) {
@@ -179,7 +217,9 @@ class ApiService {
 
   String _mensagemDeErro(http.Response resposta) {
     try {
+      // A API responde erros no padrao Problem Details: a mensagem para o usuario vem em "detail".
       final json = jsonDecode(utf8.decode(resposta.bodyBytes));
+      if (json is Map && json['detail'] != null) return json['detail'] as String;
       if (json is Map && json['mensagem'] != null) return json['mensagem'] as String;
       if (json is Map && json['title'] != null) return json['title'] as String;
     } catch (_) {}
