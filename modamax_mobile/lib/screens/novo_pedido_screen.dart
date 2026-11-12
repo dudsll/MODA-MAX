@@ -19,6 +19,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
 
   Cliente? _cliente;
   String _tipoVenda = 'Varejo';
+  String _formaPagamento = 'Pix';
+  int _parcelas = 1;
   final List<ItemCarrinho> _itens = [];
   bool _enviando = false;
 
@@ -98,6 +100,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
         idCliente: _cliente!.idCliente,
         tipoVenda: _tipoVenda,
         itens: _itens,
+        formaPagamento: _formaPagamento,
+        parcelas: _formaPagamento == 'Credito' ? _parcelas : 1,
       );
       if (!mounted) return;
       mostrarMensagem(context, 'Pedido #${pedido.idPedido} registrado.');
@@ -142,6 +146,31 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
                 selected: {_tipoVenda},
                 onSelectionChanged: (s) => setState(() => _tipoVenda = s.first),
               ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: _formaPagamento,
+                decoration: const InputDecoration(labelText: 'Forma de pagamento'),
+                items: [
+                  for (final forma in formasPagamento.entries) DropdownMenuItem(value: forma.key, child: Text(forma.value)),
+                ],
+                onChanged: (f) => setState(() {
+                  _formaPagamento = f ?? 'Pix';
+                  if (_formaPagamento != 'Credito') _parcelas = 1;
+                }),
+              ),
+              // Parcelamento so no cartao de credito, de 1 a 6 vezes (mesma regra da API).
+              if (_formaPagamento == 'Credito') ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  value: _parcelas,
+                  decoration: const InputDecoration(labelText: 'Parcelas'),
+                  items: [
+                    for (var n = 1; n <= maxParcelas; n++)
+                      DropdownMenuItem(value: n, child: Text(n == 1 ? 'À vista' : '${n}x de ${formatarMoeda(_total / n)}')),
+                  ],
+                  onChanged: (n) => setState(() => _parcelas = n ?? 1),
+                ),
+              ],
               const SizedBox(height: 16),
               Row(
                 children: [

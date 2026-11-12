@@ -1,0 +1,136 @@
+@model List<modamax.web.Services.ItemCurvaAbc>
+@{
+    ViewData["Title"] = "Curva ABC";
+    var filtro = new Dictionary<string, string?>
+    {
+        ["dataInicial"] = ((DateTime?)ViewBag.DataInicial)?.ToString("yyyy-MM-dd"),
+        ["dataFinal"] = ((DateTime?)ViewBag.DataFinal)?.ToString("yyyy-MM-dd")
+    };
+    var total = Model.Sum(i => i.Faturamento);
+    var classes = new[] { 'A', 'B', 'C' }.Select(c => new
+    {
+        Classe = c,
+        Produtos = Model.Count(i => i.Classe == c),
+        Faturamento = Model.Where(i => i.Classe == c).Sum(i => i.Faturamento),
+        Descricao = c switch { 'A' => "Prioridade máxima de estoque e vitrine", 'B' => "Acompanhar de perto", _ => "Revisar mix, preço ou promoção" }
+    }).ToList();
+    var grafico = Model.Where(i => i.Faturamento > 0).Select(i => new { rotulo = i.Produto, valor = i.Faturamento, acumulado = i.Acumulado, classe = i.Classe.ToString() });
+}
+
+<div class="page-header">
+    <div>
+        <p class="section-kicker">Análises</p>
+        <h1>Curva ABC de produtos</h1>
+        <p class="page-copy">Princípio de Pareto: poucos produtos concentram a maior parte do faturamento. Classe A soma até 80%, B até 95% e C o restante.</p>
+    </div>
+    <div class="header-actions">
+        <a class="btn btn-primary" asp-action="ExportarCurvaAbc" asp-all-route-data="filtro">
+            <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-file-spreadsheet" /></svg>Exportar Excel
+        </a>
+    </div>
+</div>
+
+<div class="content-card mb-4">
+    <form method="get" class="row g-3">
+        <div class="col-md-3"><label class="form-label" for="dataInicial">Data inicial</label><input id="dataInicial" type="date" name="dataInicial" value="@filtro["dataInicial"]" class="form-control" /></div>
+        <div class="col-md-3"><label class="form-label" for="dataFinal">Data final</label><input id="dataFinal" type="date" name="dataFinal" value="@filtro["dataFinal"]" class="form-control" /></div>
+        <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary" type="submit">Gerar</button></div>
+        <div class="col-md-4 d-flex align-items-end"><span class="text-muted">Período: @ViewBag.Periodo</span></div>
+    </form>
+</div>
+
+<section class="metrics-grid" style="grid-template-columns: repeat(3, minmax(0, 1fr))">
+    @foreach (var c in classes)
+    {
+        var participacao = total == 0 ? 0 : Math.Round(c.Faturamento / total * 100, 1);
+        <article class="metric-card">
+            <span class="classe-abc classe-@c.Classe" aria-hidden="true">@c.Classe</span>
+            <span class="metric-label mt-2">Classe @c.Classe · @c.Produtos produto(s)</span>
+            <strong>@participacao.ToString("0.#")% do faturamento</strong>
+            <span class="variacao neutra">@c.Descricao</span>
+        </article>
+    }
+</section>
+
+<article class="content-card chart-card">
+    <div class="section-heading">
+        <div>
+            <p class="section-kicker">Pareto</p>
+            <h2>Faturamento e participação acumulada</h2>
+        </div>
+    </div>
+    <div class="chart-box" style="height:320px">
+        <canvas id="grafico-abc" role="img" aria-label="@string.Join(", ", Model.Where(i => i.Faturamento > 0).Select(i => $"{i.Produto}: classe {i.Classe}, {i.Acumulado:0.#}% acumulado"))"></canvas>
+    </div>
+</article>
+
+<div class="content-card">
+    <div class="table-responsive">
+        <table class="table table-modern">
+            <thead>
+                <tr><th>Classe</th><th>Produto</th><th>Categoria</th><th class="text-end">Peças</th><th class="text-end">Faturamento</th><th class="text-end">Participação</th><th class="text-end">Acumulado</th></tr>
+            </thead>
+            <tbody>
+            @foreach (var item in Model)
+            {
+                <tr>
+                    <td><span class="classe-abc classe-@item.Classe">@item.Classe</span></td>
+                    <td><a asp-controller="Produto" asp-action="Details" asp-route-id="@item.IdProduto" style="color:inherit">@item.Produto</a></td>
+                    <td>@item.Categoria</td>
+                    <td class="text-end">@item.Quantidade</td>
+                    <td class="text-end">@item.Faturamento.ToString("C")</td>
+                    <td class="text-end">@item.Participacao.ToString("0.00")%</td>
+                    <td class="text-end">@item.Acumulado.ToString("0.00")%</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
+    <script>
+        (function () {
+            const dados = @Json.Serialize(grafico);
+            const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
+            const coresClasse = { A: '#34c759', B: '#ff9500', C: '#8e8e93' };
+            let grafico;
+
+            function desenhar() {
+                const c = window.ModaMax.cores();
+                Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+                Chart.defaults.color = c.texto;
+                grafico && grafico.destroy();
+                grafico = new Chart(document.getElementById('grafico-abc'), {
+                    type: 'bar',
+                    data: {
+                        labels: dados.map(d => d.rotulo),
+                        datasets: [
+                            { type: 'bar', label: 'Faturamento', data: dados.map(d => d.valor), backgroundColor: dados.map(d => coresClasse[d.classe]), borderRadius: 8, yAxisID: 'y' },
+                            { type: 'line', label: 'Acumulado (%)', data: dados.map(d => d.acumulado), borderColor: c.azul, backgroundColor: c.azul, tension: 0.35, pointRadius: 3, yAxisID: 'y1' }
+                        ]
+                    },
+                    options: {
+                        // Sem animacao de entrada: neste grafico misto (barras + linha em dois eixos)
+                        // a animacao do Chart.js 4.4 deixava as barras sem desenhar.
+                        animation: false,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom' },
+                            tooltip: { callbacks: { label: ctx => ctx.dataset.yAxisID === 'y' ? moeda.format(ctx.parsed.y) : ctx.parsed.y.toFixed(1) + '% acumulado' } }
+                        },
+                        scales: {
+                            x: { grid: { display: false } },
+                            y: { beginAtZero: true, grid: { color: c.grade }, ticks: { callback: v => moeda.format(v) } },
+                            y1: { position: 'right', min: 0, max: 100, grid: { display: false }, ticks: { callback: v => v + '%' } }
+                        }
+                    }
+                });
+            }
+
+            desenhar();
+            document.addEventListener('modamax:tema', desenhar);
+        })();
+    </script>
+}

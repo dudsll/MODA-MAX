@@ -97,7 +97,10 @@ public record PedidoDto(
     string TiposVenda,
     string Status,
     decimal ValorTotal,
-    IReadOnlyList<ItemPedidoDto> Itens);
+    IReadOnlyList<ItemPedidoDto> Itens,
+    string FormaPagamento,
+    int Parcelas,
+    string StatusPagamento);
 
 public class PedidoCriarDto
 {
@@ -109,7 +112,38 @@ public class PedidoCriarDto
 
     [MinLength(1, ErrorMessage = "O pedido precisa ter ao menos um item.")]
     public List<PedidoItemCriarDto> Itens { get; set; } = new();
+
+    // Pix, Credito, Debito, Boleto ou Dinheiro; parcelas de 1 a 6 apenas no credito.
+    [RegularExpression("Pix|Credito|Debito|Boleto|Dinheiro", ErrorMessage = "Forma de pagamento invalida.")]
+    public string FormaPagamento { get; set; } = "Pix";
+
+    [Range(1, 6, ErrorMessage = "O numero de parcelas deve ser de 1 a 6.")]
+    public int Parcelas { get; set; } = 1;
 }
+
+public record PixDto(int IdPedido, decimal Valor, string CopiaECola);
+
+public record IndicadorMetaDto(decimal Meta, decimal Realizado, int Percentual);
+
+public record MetaDto(
+    string Mes,
+    bool Definida,
+    IndicadorMetaDto Faturamento,
+    IndicadorMetaDto Pedidos,
+    IndicadorMetaDto Pecas,
+    decimal ProjecaoFaturamento,
+    int DiasRestantes);
+
+public record ReposicaoDto(
+    int IdProduto,
+    string Produto,
+    string? Categoria,
+    string? FotoUrl,
+    int Estoque,
+    int VendidosNoPeriodo,
+    int? DiasDeCobertura,
+    int QuantidadeSugerida,
+    string Situacao);
 
 public class PedidoItemCriarDto
 {

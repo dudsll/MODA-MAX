@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/api_service.dart';
+import 'tema.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,16 +18,8 @@ class ModaMaxApp extends StatelessWidget {
     return MaterialApp(
       title: 'ModaMax',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1F3A68)),
-        useMaterial3: true,
-        // Alvos de toque maiores ajudam usuarios com dificuldade motora.
-        materialTapTargetSize: MaterialTapTargetSize.padded,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1F3A68), brightness: Brightness.dark),
-        useMaterial3: true,
-      ),
+      theme: temaModaMax(Brightness.light),
+      darkTheme: temaModaMax(Brightness.dark),
       home: const _Inicio(),
     );
   }

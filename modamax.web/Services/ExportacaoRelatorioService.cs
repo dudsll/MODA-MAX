@@ -76,16 +76,68 @@ public class ExportacaoRelatorioService
         return memoria.ToArray();
     }
 
+    // Pedido de compra sugerido pela central de reposicao, uma aba por fornecedor.
+    public byte[] GerarExcelPedidoCompra(IReadOnlyList<SugestaoReposicao> itens)
+    {
+        using var planilha = new XLWorkbook();
+        var resumo = planilha.Worksheets.Add("Resumo");
+        resumo.Cell("A1").Value = "ModaMax – Pedido de compra sugerido";
+        resumo.Cell("A1").Style.Font.SetBold().Font.SetFontSize(14).Font.SetFontColor(XLColor.FromHtml(CorMarca));
+        resumo.Cell("A2").Value = $"Gerado em {DateTime.Now:dd/MM/yyyy HH:mm} pela central de reposição";
+        Tabela(resumo, new[] { "Fornecedor", "Produtos", "Peças" },
+            itens.GroupBy(i => i.Fornecedor ?? "Sem fornecedor")
+                .Select(g => new XLCellValue[] { g.Key, g.Count(), g.Sum(i => i.QuantidadeSugerida) }),
+            new[] { 30.0, 12, 12 }, colunaMoeda: 0, linhaInicial: 4);
+
+        foreach (var fornecedor in itens.GroupBy(i => i.Fornecedor ?? "Sem fornecedor"))
+        {
+            var nomeAba = new string(fornecedor.Key.Where(c => !"[]*?/\\:".Contains(c)).Take(31).ToArray());
+            var aba = planilha.Worksheets.Add(nomeAba);
+            Tabela(aba, new[] { "Produto", "Categoria", "Estoque", "Vendidos no período", "Dias de cobertura", "Comprar" },
+                fornecedor.Select(i => new XLCellValue[]
+                {
+                    i.Produto, i.Categoria ?? "", i.Estoque, i.VendidosNoPeriodo,
+                    i.DiasDeCobertura.HasValue ? (XLCellValue)i.DiasDeCobertura.Value : "sem giro", i.QuantidadeSugerida
+                }),
+                new[] { 30.0, 16, 10, 20, 18, 12 }, colunaMoeda: 0);
+        }
+
+        using var memoria = new MemoryStream();
+        planilha.SaveAs(memoria);
+        return memoria.ToArray();
+    }
+
+    // Curva ABC em planilha, com participacao e acumulado em percentual.
+    public byte[] GerarExcelCurvaAbc(IReadOnlyList<ItemCurvaAbc> itens, string periodo)
+    {
+        using var planilha = new XLWorkbook();
+        var aba = planilha.Worksheets.Add("Curva ABC");
+        Tabela(aba, new[] { "Classe", "Produto", "Categoria", "Peças", "Faturamento", "Participação (%)", "Acumulado (%)" },
+            itens.Select(i => new XLCellValue[] { i.Classe.ToString(), i.Produto, i.Categoria ?? "", i.Quantidade, i.Faturamento, i.Participacao, i.Acumulado }),
+            new[] { 9.0, 30, 16, 10, 16, 16, 16 }, colunaMoeda: 5);
+        aba.Column(6).Style.NumberFormat.Format = "0.00";
+        aba.Column(7).Style.NumberFormat.Format = "0.00";
+        var info = planilha.Worksheets.Add("Sobre");
+        info.Cell("A1").Value = $"Curva ABC de produtos – {periodo}";
+        info.Cell("A2").Value = "A: produtos que somam até 80% do faturamento; B: até 95%; C: o restante.";
+        info.Column(1).Width = 80;
+
+        using var memoria = new MemoryStream();
+        planilha.SaveAs(memoria);
+        return memoria.ToArray();
+    }
+
     // Cria uma tabela do Excel (com filtro e linhas zebradas) a partir das linhas informadas.
-    private static void Tabela(IXLWorksheet aba, string[] cabecalho, IEnumerable<XLCellValue[]> linhas, double[] larguras, int colunaMoeda)
+    // colunaMoeda = 0 quando a tabela nao tem coluna de valores em reais.
+    private static void Tabela(IXLWorksheet aba, string[] cabecalho, IEnumerable<XLCellValue[]> linhas, double[] larguras, int colunaMoeda, int linhaInicial = 1)
     {
         for (var c = 0; c < cabecalho.Length; c++)
         {
-            aba.Cell(1, c + 1).Value = cabecalho[c];
+            aba.Cell(linhaInicial, c + 1).Value = cabecalho[c];
             aba.Column(c + 1).Width = larguras[c];
         }
 
-        var linha = 2;
+        var linha = linhaInicial + 1;
         foreach (var valores in linhas)
         {
             for (var c = 0; c < valores.Length; c++)
@@ -96,11 +148,14 @@ public class ExportacaoRelatorioService
         }
 
         // Uma tabela do Excel precisa de ao menos uma linha de dados.
-        var ultimaLinha = Math.Max(linha - 1, 2);
-        var intervalo = aba.Range(1, 1, ultimaLinha, cabecalho.Length);
+        var ultimaLinha = Math.Max(linha - 1, linhaInicial + 1);
+        var intervalo = aba.Range(linhaInicial, 1, ultimaLinha, cabecalho.Length);
         intervalo.CreateTable().Theme = XLTableTheme.TableStyleMedium3;
-        aba.Column(colunaMoeda).Style.NumberFormat.Format = FormatoMoeda;
-        aba.SheetView.FreezeRows(1);
+        if (colunaMoeda > 0)
+        {
+            aba.Column(colunaMoeda).Style.NumberFormat.Format = FormatoMoeda;
+        }
+        aba.SheetView.FreezeRows(linhaInicial);
     }
 
     public byte[] GerarPdf(RelatorioViewModel relatorio, string emitidoPor)

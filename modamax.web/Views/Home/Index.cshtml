@@ -1,72 +1,103 @@
+@using modamax.web.Services
 @model modamax.web.ViewModels.DashboardViewModel
 
 @{
-    ViewData["Title"] = "Dashboard";
+    ViewData["Title"] = "Painel";
+    var hoje = DateTime.Today;
+    var dataExtenso = hoje.ToString("dddd, d 'de' MMMM");
+    dataExtenso = char.ToUpper(dataExtenso[0]) + dataExtenso[1..];
 }
 
-<section class="hero-panel">
+@functions {
+    // Seta e cor da variacao em relacao ao mesmo periodo do mes anterior.
+    private Microsoft.AspNetCore.Html.IHtmlContent Variacao(int? variacao)
+    {
+        if (variacao == null)
+        {
+            return new Microsoft.AspNetCore.Html.HtmlString("<span class=\"variacao neutra\">sem base de comparação</span>");
+        }
+
+        var classe = variacao > 0 ? "positiva" : variacao < 0 ? "negativa" : "neutra";
+        var icone = variacao >= 0 ? "i-trending-up" : "i-trending-down";
+        var sinal = variacao > 0 ? "+" : "";
+        return new Microsoft.AspNetCore.Html.HtmlString(
+            $"<span class=\"variacao {classe}\"><svg class=\"icone\" aria-hidden=\"true\"><use href=\"/img/icones.svg#{icone}\" /></svg>{sinal}{variacao}% vs. mês anterior</span>");
+    }
+
+    private static string ClasseStatus(string status) => status switch { "Finalizado" => "status-verde", "Cancelado" => "status-vermelho", _ => "status-laranja" };
+}
+
+<div class="page-header">
     <div>
-        <p class="eyebrow">ModaMax</p>
-        <h1>Painel de controle da loja</h1>
-        <p class="hero-copy">
-            Acompanhe os principais números do sistema, os pedidos mais recentes e os produtos que pedem reposição.
-        </p>
+        <p class="section-kicker">@dataExtenso</p>
+        <h1>@Model.Saudacao, @Model.PrimeiroNome</h1>
+        <p class="page-copy">Veja como estão as vendas, as metas e o estoque da ModaMax hoje.</p>
     </div>
-    <div class="hero-badge">Gestão comercial e estoque</div>
-</section>
+    <div class="header-actions">
+        <a class="btn btn-outline-secondary" asp-controller="Relatorio" asp-action="Index">
+            <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-chart-column" /></svg>Relatórios
+        </a>
+        <a class="btn btn-primary" asp-controller="Pedido" asp-action="Create">
+            <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-plus" /></svg>Novo pedido
+        </a>
+    </div>
+</div>
 
 <section class="metrics-grid metrics-grid-primary">
-    <article class="metric-card">
-        <span class="metric-label">Produtos cadastrados</span>
-        <strong>@Model.TotalProdutos</strong>
-    </article>
-    <article class="metric-card">
-        <span class="metric-label">Clientes ativos</span>
-        <strong>@Model.TotalClientes</strong>
-    </article>
-    <article class="metric-card">
-        <span class="metric-label">Pedidos</span>
-        <strong>@Model.TotalPedidos</strong>
-    </article>
-    <article class="metric-card">
-        <span class="metric-label">Usuários</span>
-        <strong>@Model.TotalUsuarios</strong>
-    </article>
     <article class="metric-card accent-card">
-        <span class="metric-label">Faturamento</span>
-        <strong>@Model.FaturamentoTotal.ToString("C")</strong>
+        <span class="metric-icone"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-circle-dollar-sign" /></svg></span>
+        <span class="metric-label">Faturamento do mês</span>
+        <strong>@Model.FaturamentoMes.Atual.ToString("C0")</strong>
+        @Variacao(Model.FaturamentoMes.Variacao)
     </article>
-</section>
-
-<section class="metrics-grid metrics-grid-secondary">
     <article class="metric-card">
-        <span class="metric-label">Estoque em alerta</span>
+        <span class="metric-icone" style="background:var(--indigo)"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-receipt" /></svg></span>
+        <span class="metric-label">Pedidos do mês</span>
+        <strong>@Model.PedidosMes.Atual.ToString("0")</strong>
+        @Variacao(Model.PedidosMes.Variacao)
+    </article>
+    <article class="metric-card">
+        <span class="metric-icone" style="background:var(--verde-vivo)"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-wallet" /></svg></span>
+        <span class="metric-label">Ticket médio</span>
+        <strong>@Model.TicketMedioMes.Atual.ToString("C0")</strong>
+        @Variacao(Model.TicketMedioMes.Variacao)
+    </article>
+    <article class="metric-card">
+        <span class="metric-icone" style="background:var(--laranja-vivo)"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-hand-coins" /></svg></span>
+        <span class="metric-label">A receber</span>
+        <strong>@Model.AReceber.ToString("C0")</strong>
+        <span class="variacao neutra">@Model.PedidosAReceber pedido(s) com pagamento pendente</span>
+    </article>
+    <article class="metric-card quick-link-card">
+        <span class="metric-icone" style="background:var(--vermelho-vivo)"><svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-package" /></svg></span>
+        <span class="metric-label">Para repor</span>
         <strong>@Model.ProdutosAbaixoDoMinimo</strong>
-    </article>
-    <article class="metric-card quick-link-card">
-        <span class="metric-label">Novo pedido</span>
-        <a asp-controller="Pedido" asp-action="Create">Registrar venda</a>
-    </article>
-    <article class="metric-card quick-link-card">
-        <span class="metric-label">Histórico</span>
-        <a asp-controller="Pedido" asp-action="Historico">Ver pedidos</a>
-    </article>
-    <article class="metric-card quick-link-card">
-        <span class="metric-label">Relatórios</span>
-        <a asp-controller="Relatorio" asp-action="Index">Abrir relatórios</a>
+        <a asp-controller="Reposicao" asp-action="Index">Abrir central <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-chevron-right" /></svg></a>
     </article>
 </section>
 
 <section class="charts-grid">
-    <article class="content-card chart-card chart-card-wide">
+    @if (Model.Meta != null)
+    {
+        <article class="content-card">
+            <div class="section-heading">
+                <div>
+                    <p class="section-kicker">Metas · @Model.Meta.NomeMes</p>
+                    <h2>Como está o mês</h2>
+                </div>
+                <a class="btn btn-sm btn-outline-primary" asp-controller="Meta" asp-action="Index">Detalhes</a>
+            </div>
+            <partial name="_AneisMeta" model="Model.Meta" />
+        </article>
+    }
+    <article class="content-card chart-card">
         <div class="section-heading">
             <div>
                 <p class="section-kicker">Vendas</p>
                 <h2>Faturamento por mês</h2>
             </div>
-            <a class="btn btn-outline-primary" asp-controller="Relatorio" asp-action="Index">Ver relatório</a>
         </div>
-        <div class="chart-box">
+        <div class="chart-box" style="height:220px">
             <canvas id="grafico-vendas" role="img" aria-label="@string.Join(", ", Model.Graficos.VendasPorMes.Select(p => $"{p.Rotulo}: {p.Valor:C}"))"></canvas>
         </div>
     </article>
@@ -99,7 +130,7 @@
                 <h2>Peças em estoque por categoria</h2>
             </div>
         </div>
-        <div class="chart-box">
+        <div class="chart-box" style="height:240px">
             <canvas id="grafico-estoque" role="img" aria-label="@string.Join(", ", Model.Graficos.EstoquePorCategoria.Select(p => $"{p.Rotulo}: {p.Valor:0} peças"))"></canvas>
         </div>
     </article>
@@ -109,61 +140,22 @@
     <article class="content-card">
         <div class="section-heading">
             <div>
-                <p class="section-kicker">Estoque</p>
-                <h2>Produtos com menor estoque</h2>
-            </div>
-            <a class="btn btn-outline-primary" asp-controller="Produto" asp-action="Index">Ver produtos</a>
-        </div>
-
-        <div class="table-responsive">
-            <table class="table table-modern">
-                <thead>
-                    <tr>
-                        <th>Produto</th>
-                        <th>Categoria</th>
-                        <th>Estoque</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var produto in Model.ProdutosComMenorEstoque)
-                {
-                    <tr>
-                        <td>@produto.Nome</td>
-                        <td>@produto.Categoria?.Nome</td>
-                        <td>@produto.Estoque</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
-    </article>
-
-    <article class="content-card">
-        <div class="section-heading">
-            <div>
                 <p class="section-kicker">Vendas</p>
                 <h2>Pedidos recentes</h2>
             </div>
+            <a class="btn btn-sm btn-outline-primary" asp-controller="Pedido" asp-action="Index">Ver todos</a>
         </div>
-
         <div class="table-responsive">
             <table class="table table-modern">
-                <thead>
-                    <tr>
-                        <th>Pedido</th>
-                        <th>Cliente</th>
-                        <th>Status</th>
-                        <th>Valor</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Pedido</th><th>Cliente</th><th>Status</th><th class="text-end">Valor</th></tr></thead>
                 <tbody>
                 @foreach (var pedido in Model.PedidosRecentes)
                 {
                     <tr>
-                        <td>#@pedido.IdPedido</td>
-                        <td>@pedido.Cliente?.Nome</td>
-                        <td>@pedido.Status</td>
-                        <td>@pedido.ValorTotal.ToString("C")</td>
+                        <td><a asp-controller="Pedido" asp-action="Details" asp-route-id="@pedido.IdPedido">#@pedido.IdPedido</a></td>
+                        <td>@pedido.Cliente?.Nome<small class="d-block text-muted">@pedido.DataPedido.ToString("dd/MM HH:mm") · @Pagamentos.Nome(pedido.FormaPagamento)</small></td>
+                        <td><span class="status @ClasseStatus(pedido.Status)">@pedido.Status</span></td>
+                        <td class="text-end">@pedido.ValorTotal.ToString("C")</td>
                     </tr>
                 }
                 </tbody>
@@ -174,99 +166,122 @@
     <article class="content-card">
         <div class="section-heading">
             <div>
-                <p class="section-kicker">Auditoria</p>
-                <h2>Logs recentes</h2>
+                <p class="section-kicker">Estoque</p>
+                <h2>Precisam de reposição</h2>
             </div>
+            <a class="btn btn-sm btn-outline-primary" asp-controller="Reposicao" asp-action="Index">Central</a>
         </div>
-
-        <div class="table-responsive">
-            <table class="table table-modern">
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Usuário</th>
-                        <th>Ação</th>
-                    </tr>
-                </thead>
-                <tbody>
-                @foreach (var log in Model.LogsRecentes)
-                {
-                    <tr>
-                        <td>@log.Data.ToString("dd/MM/yyyy HH:mm")</td>
-                        <td>@(log.Usuario?.Nome ?? "Sistema")</td>
-                        <td>@log.Acao</td>
-                    </tr>
-                }
-                </tbody>
-            </table>
-        </div>
+        @if (Model.ParaRepor.Count == 0)
+        {
+            <div class="vazio">
+                <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-circle-check" /></svg>
+                <p class="mb-0">Todos os produtos estão com estoque em dia.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-modern">
+                    <thead><tr><th>Produto</th><th class="text-end">Estoque</th><th class="text-end">Dura</th><th class="text-end">Comprar</th></tr></thead>
+                    <tbody>
+                    @foreach (var item in Model.ParaRepor)
+                    {
+                        <tr>
+                            <td>
+                                <span class="status @(item.Situacao == SituacaoReposicao.Critico ? "status-vermelho" : "status-laranja")" style="padding:0.1rem 0.4rem" aria-hidden="true"></span>
+                                <a asp-controller="Produto" asp-action="Details" asp-route-id="@item.IdProduto" style="color:inherit">@item.Produto</a>
+                            </td>
+                            <td class="text-end">@item.Estoque</td>
+                            <td class="text-end">@(item.DiasDeCobertura.HasValue ? $"{item.DiasDeCobertura} dias" : "–")</td>
+                            <td class="text-end"><strong>@item.QuantidadeSugerida</strong></td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        }
     </article>
+
+    @if (Model.LogsRecentes.Count > 0)
+    {
+        <article class="content-card" style="grid-column: 1 / -1">
+            <div class="section-heading">
+                <div>
+                    <p class="section-kicker">Auditoria</p>
+                    <h2>Atividade recente</h2>
+                </div>
+                <a class="btn btn-sm btn-outline-primary" asp-controller="Log" asp-action="Index">Ver tudo</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-modern">
+                    <thead><tr><th>Quando</th><th>Quem</th><th>O quê</th></tr></thead>
+                    <tbody>
+                    @foreach (var log in Model.LogsRecentes)
+                    {
+                        <tr>
+                            <td class="text-nowrap">@log.Data.ToString("dd/MM HH:mm")</td>
+                            <td>@(log.Usuario?.Nome ?? "Sistema")</td>
+                            <td>@log.Acao</td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </article>
+    }
 </section>
 
 @section Scripts {
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+    <script src="~/lib/chartjs/chart.umd.min.js"></script>
     <script>
         (function () {
-            if (typeof Chart === 'undefined') return; // sem internet: os cards ficam so com o texto acessivel
+            if (typeof Chart === 'undefined') return;
 
             const graficos = @Json.Serialize(Model.Graficos);
-            const estilo = getComputedStyle(document.documentElement);
-            const cor = nome => estilo.getPropertyValue(nome).trim();
-            const paleta = [cor('--primary'), cor('--accent'), cor('--success'), '#b9775f', '#5b4636', '#e4c393'];
-            const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+            const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
             const rotulos = lista => lista.map(p => p.rotulo);
             const valores = lista => lista.map(p => p.valor);
+            let instancias = [];
 
-            Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
-            Chart.defaults.color = cor('--muted');
-            Chart.defaults.maintainAspectRatio = false;
+            function desenhar() {
+                instancias.forEach(g => g.destroy());
+                const c = window.ModaMax.cores();
+                Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+                Chart.defaults.color = c.texto;
+                Chart.defaults.maintainAspectRatio = false;
+                const grade = { color: c.grade };
 
-            new Chart(document.getElementById('grafico-vendas'), {
-                type: 'line',
-                data: {
-                    labels: rotulos(graficos.vendasPorMes),
-                    datasets: [{
-                        label: 'Faturamento',
-                        data: valores(graficos.vendasPorMes),
-                        borderColor: paleta[0],
-                        backgroundColor: 'rgba(140, 63, 47, 0.12)',
-                        fill: true,
-                        tension: 0.35,
-                        pointRadius: 4
-                    }]
-                },
-                options: {
-                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => moeda.format(c.parsed.y) } } },
-                    scales: { y: { beginAtZero: true, ticks: { callback: v => moeda.format(v) } } }
-                }
-            });
+                const contexto = document.getElementById('grafico-vendas').getContext('2d');
+                const degrade = contexto.createLinearGradient(0, 0, 0, 220);
+                degrade.addColorStop(0, 'rgba(10, 132, 255, 0.35)');
+                degrade.addColorStop(1, 'rgba(10, 132, 255, 0)');
 
-            new Chart(document.getElementById('grafico-produtos'), {
-                type: 'bar',
-                data: {
-                    labels: rotulos(graficos.produtosMaisVendidos),
-                    datasets: [{ label: 'Unidades vendidas', data: valores(graficos.produtosMaisVendidos), backgroundColor: paleta[1], borderRadius: 6 }]
-                },
-                options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, ticks: { precision: 0 } } } }
-            });
+                instancias = [
+                    new Chart(contexto, {
+                        type: 'line',
+                        data: { labels: rotulos(graficos.vendasPorMes), datasets: [{ label: 'Faturamento', data: valores(graficos.vendasPorMes), borderColor: c.azul, backgroundColor: degrade, fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2.5 }] },
+                        options: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: x => moeda.format(x.parsed.y) } } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: grade, ticks: { callback: v => moeda.format(v) } } } }
+                    }),
+                    new Chart(document.getElementById('grafico-produtos'), {
+                        type: 'bar',
+                        data: { labels: rotulos(graficos.produtosMaisVendidos), datasets: [{ label: 'Unidades', data: valores(graficos.produtosMaisVendidos), backgroundColor: c.paleta[1], borderRadius: 8, barThickness: 18 }] },
+                        options: { indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: grade, ticks: { precision: 0 } }, y: { grid: { display: false } } } }
+                    }),
+                    new Chart(document.getElementById('grafico-status'), {
+                        type: 'doughnut',
+                        data: { labels: rotulos(graficos.pedidosPorStatus), datasets: [{ data: valores(graficos.pedidosPorStatus), backgroundColor: rotulos(graficos.pedidosPorStatus).map(r => ({ 'Finalizado': '#30d158', 'Em separação': '#ff9f0a', 'Cancelado': '#ff453a' }[r] || '#0a84ff')), borderWidth: 0, spacing: 3, borderRadius: 6 }] },
+                        options: { cutout: '68%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true } } } }
+                    }),
+                    new Chart(document.getElementById('grafico-estoque'), {
+                        type: 'bar',
+                        data: { labels: rotulos(graficos.estoquePorCategoria), datasets: [{ label: 'Peças', data: valores(graficos.estoquePorCategoria), backgroundColor: c.paleta[0], borderRadius: 8, barThickness: 28 }] },
+                        options: { plugins: { legend: { display: false } }, scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: grade, ticks: { precision: 0 } } } }
+                    })
+                ];
+            }
 
-            new Chart(document.getElementById('grafico-status'), {
-                type: 'doughnut',
-                data: {
-                    labels: rotulos(graficos.pedidosPorStatus),
-                    datasets: [{ data: valores(graficos.pedidosPorStatus), backgroundColor: paleta, borderWidth: 0 }]
-                },
-                options: { cutout: '62%', plugins: { legend: { position: 'bottom' } } }
-            });
-
-            new Chart(document.getElementById('grafico-estoque'), {
-                type: 'bar',
-                data: {
-                    labels: rotulos(graficos.estoquePorCategoria),
-                    datasets: [{ label: 'Peças', data: valores(graficos.estoquePorCategoria), backgroundColor: paleta[2], borderRadius: 6 }]
-                },
-                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
-            });
+            desenhar();
+            document.addEventListener('modamax:tema', desenhar);
         })();
     </script>
 }

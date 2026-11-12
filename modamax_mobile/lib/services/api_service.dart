@@ -101,16 +101,40 @@ class ApiService {
   Future<Pedido> pedido(int id) async =>
       Pedido.fromJson(await _enviar('GET', '/api/pedidos/$id') as Map<String, dynamic>);
 
-  Future<Pedido> criarPedido({required int idCliente, required String tipoVenda, required List<ItemCarrinho> itens}) async {
+  Future<Pedido> criarPedido({
+    required int idCliente,
+    required String tipoVenda,
+    required List<ItemCarrinho> itens,
+    String formaPagamento = 'Pix',
+    int parcelas = 1,
+  }) async {
     final json = await _enviar('POST', '/api/pedidos', corpo: {
       'idCliente': idCliente,
       'tiposVenda': tipoVenda,
+      'formaPagamento': formaPagamento,
+      'parcelas': parcelas,
       'itens': itens.map((i) => i.toJson()).toList(),
     });
     return Pedido.fromJson(json as Map<String, dynamic>);
   }
 
   Future<void> cancelarPedido(int id) => _enviar('PUT', '/api/pedidos/$id/cancelar');
+
+  Future<void> confirmarPagamento(int id) => _enviar('PUT', '/api/pedidos/$id/pagamento');
+
+  /// "PIX copia e cola" do pedido para enviar ao cliente.
+  Future<String> pixDoPedido(int id) async =>
+      ((await _enviar('GET', '/api/pedidos/$id/pix')) as Map<String, dynamic>)['copiaECola'] as String;
+
+  Future<Dados<MetaAtual>> metaAtual() => _lerComCache(
+        '/api/metas/atual',
+        (json) => MetaAtual.fromJson(json as Map<String, dynamic>),
+      );
+
+  Future<Dados<List<ItemReposicao>>> reposicao() => _lerComCache(
+        '/api/reposicao',
+        (json) => (json as List).map((r) => ItemReposicao.fromJson(r as Map<String, dynamic>)).toList(),
+      );
 
   /// Busca o produto pelo codigo de barras lido na camera (sem cache: o estoque precisa ser o atual).
   Future<Produto> produtoPorCodigo(String codigo) async => Produto.fromJson(

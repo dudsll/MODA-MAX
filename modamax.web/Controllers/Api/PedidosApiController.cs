@@ -15,11 +15,13 @@ public class PedidosApiController : ControllerBase
 {
     private readonly AppDbContext _context;
     private readonly PedidoService _pedidoService;
+    private readonly PixService _pix;
 
-    public PedidosApiController(AppDbContext context, PedidoService pedidoService)
+    public PedidosApiController(AppDbContext context, PedidoService pedidoService, PixService pix)
     {
         _context = context;
         _pedidoService = pedidoService;
+        _pix = pix;
     }
 
     // GET /api/pedidos?clienteId=1&status=Finalizado
@@ -58,6 +60,8 @@ public class PedidosApiController : ControllerBase
         {
             IdCliente = dto.IdCliente,
             TiposVenda = dto.TiposVenda,
+            FormaPagamento = dto.FormaPagamento,
+            Parcelas = dto.Parcelas,
             Itens = dto.Itens
                 .Select(i => new ItemPedidoEntrada { IdProduto = i.IdProduto, Quantidade = i.Quantidade, Desconto = i.Desconto })
                 .ToList()
@@ -87,6 +91,34 @@ public class PedidosApiController : ControllerBase
         return NoContent();
     }
 
+    // PUT /api/pedidos/5/pagamento  (confirma o recebimento)
+    [HttpPut("{id:int}/pagamento")]
+    public async Task<IActionResult> ConfirmarPagamento(int id)
+    {
+        var resultado = await _pedidoService.ConfirmarPagamentoAsync(id);
+        if (!resultado.Sucesso)
+        {
+            return Problem(detail: resultado.Erro,
+                statusCode: resultado.NaoEncontrado ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        }
+
+        return NoContent();
+    }
+
+    // GET /api/pedidos/5/pix  ("PIX copia e cola" do pedido, para o app mostrar ao cliente)
+    [HttpGet("{id:int}/pix")]
+    public async Task<ActionResult<PixDto>> Pix(int id)
+    {
+        var pedido = await _context.Pedidos.AsNoTracking().FirstOrDefaultAsync(p => p.IdPedido == id);
+        if (pedido == null) return NotFound();
+        if (pedido.Status == PedidoService.StatusCancelado || pedido.StatusPagamento != Pagamentos.Pendente)
+        {
+            return Problem(detail: "Este pedido nao tem pagamento pendente.", statusCode: StatusCodes.Status409Conflict);
+        }
+
+        return new PixDto(pedido.IdPedido, pedido.ValorTotal, _pix.GerarPayload(pedido.ValorTotal, $"PEDIDO{pedido.IdPedido}"));
+    }
+
     private IQueryable<Pedido> ConsultaCompleta() => _context.Pedidos
         .Include(p => p.Cliente)
         .Include(p => p.Itens)
@@ -103,5 +135,8 @@ public class PedidosApiController : ControllerBase
         p.ValorTotal,
         p.Itens.Select(i => new ItemPedidoDto(
             i.IdItem, i.IdProduto, i.Produto?.Nome, i.Quantidade, i.PrecoUnitario, i.Desconto,
-            (i.PrecoUnitario * i.Quantidade) - i.Desconto)).ToList());
+            (i.PrecoUnitario * i.Quantidade) - i.Desconto)).ToList(),
+        p.FormaPagamento,
+        p.Parcelas,
+        p.StatusPagamento);
 }

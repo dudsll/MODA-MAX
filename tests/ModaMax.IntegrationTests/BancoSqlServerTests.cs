@@ -203,4 +203,49 @@ public class BancoSqlServerTests
         var usuario = await verificacao.Usuarios.AsNoTracking().SingleAsync(u => u.Email == "operacional@modamax.com");
         Assert.True(usuario.BloqueadoAte > DateTime.UtcNow);
     }
+
+    [FactSqlServer]
+    public async Task Restricao_check_limita_as_parcelas_de_1_a_6()
+    {
+        await using var contexto = _banco.NovoContexto();
+        var pedido = await contexto.Pedidos.FirstAsync();
+        pedido.Parcelas = 7;
+
+        var erro = await Assert.ThrowsAsync<DbUpdateException>(() => contexto.SaveChangesAsync());
+        Assert.Contains("CK_Pedido_Parcelas", erro.InnerException?.Message);
+    }
+
+    [FactSqlServer]
+    public async Task So_pode_existir_uma_meta_por_mes()
+    {
+        await using var contexto = _banco.NovoContexto();
+        var existente = await contexto.Metas.AsNoTracking().FirstAsync();
+        contexto.Metas.Add(new Meta { Ano = existente.Ano, Mes = existente.Mes, Faturamento = 1, Pedidos = 1, Pecas = 1 });
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => contexto.SaveChangesAsync());
+    }
+
+    [FactSqlServer]
+    public async Task Entrada_pela_central_de_reposicao_usa_a_procedure_no_sql_server()
+    {
+        var short_ = await ProdutoAsync("Short Jeans");
+
+        await using var contexto = _banco.NovoContexto();
+        var estoque = await new ReposicaoService(contexto, new ReposicaoOptions()).RegistrarEntradaAsync(short_.IdProduto, 4, "Central");
+
+        Assert.Equal(short_.Estoque + 4, estoque);
+        Assert.True(await contexto.MovimentacoesEstoque.AnyAsync(m => m.IdProduto == short_.IdProduto && m.Observacao == "Central"));
+    }
+
+    [FactSqlServer]
+    public async Task Metas_e_curva_abc_funcionam_no_sql_server()
+    {
+        await using var contexto = _banco.NovoContexto();
+        var progresso = await new MetaService(contexto).ProgressoAsync();
+        var curva = await new RelatorioService(contexto).CurvaAbcAsync(null, null);
+
+        Assert.True(progresso.Faturamento.Meta > 0);
+        Assert.Contains(curva, i => i.Classe == 'A');
+        Assert.Equal(100m, curva.Where(i => i.Faturamento > 0).Last().Acumulado, 0);
+    }
 }

@@ -41,5 +41,22 @@ public class RelatorioController : Controller
             ExportacaoRelatorioService.NomeArquivo(relatorio, "pdf"));
     }
 
+    public async Task<IActionResult> CurvaAbc(DateTime? dataInicial, DateTime? dataFinal)
+    {
+        var relatorio = new modamax.web.ViewModels.RelatorioViewModel { DataInicial = dataInicial, DataFinal = dataFinal };
+        ViewBag.Periodo = relatorio.DescricaoPeriodo;
+        ViewBag.DataInicial = dataInicial;
+        ViewBag.DataFinal = dataFinal;
+        return View(await _relatorios.CurvaAbcAsync(dataInicial, dataFinal));
+    }
+
+    public async Task<IActionResult> ExportarCurvaAbc(DateTime? dataInicial, DateTime? dataFinal)
+    {
+        var periodo = new modamax.web.ViewModels.RelatorioViewModel { DataInicial = dataInicial, DataFinal = dataFinal }.DescricaoPeriodo;
+        var itens = await _relatorios.CurvaAbcAsync(dataInicial, dataFinal);
+        await AuditoriaHelper.RegistrarAsync(_context, HttpContext, $"Curva ABC exportada em Excel ({periodo}).");
+        return File(_exportacao.GerarExcelCurvaAbc(itens, periodo), ExportacaoRelatorioService.TipoExcel, "curva-abc.xlsx");
+    }
+
     private string UsuarioAtual() => HttpContext.Session.GetString("UsuarioNome") ?? "Usuário do sistema";
 }

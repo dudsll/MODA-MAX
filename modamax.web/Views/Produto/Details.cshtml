@@ -1,51 +1,118 @@
+@using modamax.web.Services
 @model modamax.web.Models.Produto
 
 @{
-    ViewData["Title"] = "Detalhes do produto";
+    ViewData["Title"] = Model.Nome;
+    var movimentacoes = (List<MovimentacaoEstoque>)ViewBag.Movimentacoes;
+    var reposicao = ViewBag.Reposicao as SugestaoReposicao;
+    var codigoSvg = CodigoBarras.SvgEan13(Model.CodigoBarras);
 }
 
 <div class="page-header">
     <div>
-        <p class="section-kicker">Cadastros</p>
+        <p class="section-kicker">Catálogo · @Model.Categoria?.Nome</p>
         <h1>@Model.Nome</h1>
+        <p class="page-copy">Tam. @Model.Tamanho · @Model.Cor · @Model.Fornecedor?.Nome</p>
     </div>
     <div class="header-actions">
         <a class="btn btn-outline-secondary" asp-action="Index">Voltar</a>
-        <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.IdProduto">Editar</a>
+        <a class="btn btn-outline-primary" asp-controller="Etiqueta" asp-action="Index" asp-route-idProduto="@Model.IdProduto">
+            <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-printer" /></svg>Etiqueta
+        </a>
+        <a class="btn btn-primary" asp-action="Edit" asp-route-id="@Model.IdProduto">
+            <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-pencil" /></svg>Editar
+        </a>
     </div>
 </div>
 
-<div class="content-card details-card @(string.IsNullOrEmpty(Model.FotoUrl) ? "" : "produto-detalhes")">
+<div class="content-card details-card produto-detalhes">
     @if (!string.IsNullOrEmpty(Model.FotoUrl))
     {
         <img class="produto-foto" src="@Model.FotoUrl" alt="Foto de @Model.Nome" />
     }
-    <dl class="row mb-0">
-        <dt class="col-sm-3">Código</dt>
-        <dd class="col-sm-9">@Model.IdProduto</dd>
+    else
+    {
+        <div class="produto-foto d-grid" style="place-items:center; color:var(--texto-3)" aria-hidden="true">
+            <svg class="icone" style="width:3rem;height:3rem"><use href="/img/icones.svg#i-shirt" /></svg>
+        </div>
+    }
+    <div>
+        <div class="d-flex align-items-baseline gap-3 mb-2">
+            <strong style="font-size:2rem; letter-spacing:-0.03em">@Model.Preco.ToString("C")</strong>
+            <span class="text-muted">atacado @PedidoService.CalcularPrecoUnitario(Model.Preco, "Atacado").ToString("C")</span>
+        </div>
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Código</dt>
+            <dd class="col-sm-8">@Model.IdProduto</dd>
 
-        <dt class="col-sm-3">Código de barras</dt>
-        <dd class="col-sm-9">@(Model.CodigoBarras ?? "Não informado")</dd>
+            <dt class="col-sm-4">Código de barras</dt>
+            <dd class="col-sm-8 mono">@(Model.CodigoBarras ?? "Não informado")</dd>
 
-        <dt class="col-sm-3">Descrição</dt>
-        <dd class="col-sm-9">@(string.IsNullOrWhiteSpace(Model.Descricao) ? "Não informada" : Model.Descricao)</dd>
+            <dt class="col-sm-4">Descrição</dt>
+            <dd class="col-sm-8">@(string.IsNullOrWhiteSpace(Model.Descricao) ? "Não informada" : Model.Descricao)</dd>
 
-        <dt class="col-sm-3">Tamanho</dt>
-        <dd class="col-sm-9">@Model.Tamanho</dd>
+            <dt class="col-sm-4">Estoque</dt>
+            <dd class="col-sm-8">
+                <strong>@Model.Estoque peças</strong>
+                @if (reposicao != null)
+                {
+                    var classe = reposicao.Situacao switch { SituacaoReposicao.Critico => "status-vermelho", SituacaoReposicao.Atencao => "status-laranja", _ => "status-verde" };
+                    var texto = reposicao.Situacao switch { SituacaoReposicao.Critico => "Repor agora", SituacaoReposicao.Atencao => "Repor em breve", _ => "Estoque em dia" };
+                    <span class="status @classe ms-2">@texto</span>
+                }
+            </dd>
 
-        <dt class="col-sm-3">Cor</dt>
-        <dd class="col-sm-9">@Model.Cor</dd>
-
-        <dt class="col-sm-3">Categoria</dt>
-        <dd class="col-sm-9">@Model.Categoria?.Nome</dd>
-
-        <dt class="col-sm-3">Fornecedor</dt>
-        <dd class="col-sm-9">@Model.Fornecedor?.Nome</dd>
-
-        <dt class="col-sm-3">Preço</dt>
-        <dd class="col-sm-9">@Model.Preco.ToString("C")</dd>
-
-        <dt class="col-sm-3">Estoque</dt>
-        <dd class="col-sm-9">@Model.Estoque</dd>
-    </dl>
+            @if (reposicao != null)
+            {
+                <dt class="col-sm-4">Ritmo de vendas</dt>
+                <dd class="col-sm-8">
+                    @reposicao.VendidosNoPeriodo peças nos últimos 30 dias
+                    · @(reposicao.DiasDeCobertura.HasValue ? $"estoque para cerca de {reposicao.DiasDeCobertura} dias" : "sem vendas recentes")
+                    @if (reposicao.QuantidadeSugerida > 0)
+                    {
+                        <span>· sugestão de compra: <strong>@reposicao.QuantidadeSugerida peças</strong></span>
+                    }
+                </dd>
+            }
+        </dl>
+        @if (codigoSvg != null)
+        {
+            <div class="mt-3" style="max-width:260px; background:#fff; border-radius:12px; padding:0.5rem">
+                @* SVG gerado pelo sistema a partir dos digitos do codigo de barras. *@
+                @Html.Raw(codigoSvg)
+            </div>
+        }
+    </div>
 </div>
+
+<article class="content-card">
+    <div class="section-heading">
+        <div><p class="section-kicker">Estoque</p><h2>Últimas movimentações</h2></div>
+    </div>
+    @if (movimentacoes.Count == 0)
+    {
+        <div class="vazio">
+            <svg class="icone" aria-hidden="true"><use href="/img/icones.svg#i-history" /></svg>
+            <p class="mb-0">Nenhuma entrada ou saída registrada ainda.</p>
+        </div>
+    }
+    else
+    {
+        <ul class="linha-tempo">
+            @foreach (var m in movimentacoes)
+            {
+                var entrada = m.Tipo == "Entrada";
+                <li>
+                    <span class="marcador @(entrada ? "entrada" : "saida")" aria-hidden="true">
+                        <svg class="icone"><use href="/img/icones.svg#@(entrada ? "i-arrow-down-right" : "i-arrow-up-right")" /></svg>
+                    </span>
+                    <span>
+                        @(entrada ? "Entrada" : "Saída") · @m.Observacao
+                        <small>@m.Data.ToString("dd/MM/yyyy 'às' HH:mm")</small>
+                    </span>
+                    <span class="quantidade" style="color:@(entrada ? "var(--verde)" : "var(--laranja)")">@(entrada ? "+" : "−")@m.Quantidade</span>
+                </li>
+            }
+        </ul>
+    }
+</article>
