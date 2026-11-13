@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:modamax_mobile/catalogo.dart';
 import 'package:modamax_mobile/codigo_barras.dart';
 import 'package:modamax_mobile/models.dart';
 import 'package:modamax_mobile/screens/clientes_screen.dart';
 import 'package:modamax_mobile/screens/produto_form_screen.dart';
+import 'package:modamax_mobile/services/api_service.dart';
 import 'package:modamax_mobile/widgets/aneis.dart';
 
 void main() {
@@ -145,5 +147,69 @@ void main() {
     expect(iniciais('Amanda da Silva'), 'AS');
     expect(iniciais('loja'), 'L');
     expect(iniciais('  '), '?');
+  });
+
+  group('catalogo agrupado por modelo', () {
+    Produto p(int id, String nome, String tamanho, int estoque,
+            {String cor = 'Azul', double preco = 100, String categoria = 'Calca', String fornecedor = 'DZ'}) =>
+        Produto(
+          idProduto: id, nome: nome, tamanho: tamanho, cor: cor, preco: preco, estoque: estoque,
+          categoria: categoria, fornecedor: fornecedor,
+        );
+
+    final produtos = [
+      p(1, 'Calca Flare de Lantejoulas', '40', 5, preco: 200),
+      p(2, 'Calca Flare de Lantejoulas', '36', 0, preco: 200),
+      p(3, 'calca flare de lantejoulas ', '38', 20, preco: 210),
+      p(4, 'Jaqueta Jeans', 'GG', 3, categoria: 'Jaqueta', fornecedor: 'Alianza'),
+      p(5, 'Jaqueta Jeans', 'P', 30, categoria: 'Jaqueta', fornecedor: 'Alianza'),
+      p(6, 'Bermuda', '42', 50, preco: 80, categoria: 'Bermuda'),
+    ];
+
+    test('junta os tamanhos do mesmo modelo, em ordem de grade', () {
+      final modelos = agruparPorModelo(produtos);
+      expect(modelos.map((m) => m.nome), ['Bermuda', 'Calca Flare de Lantejoulas', 'Jaqueta Jeans']);
+      final calca = modelos[1];
+      expect(calca.tamanhos.map((t) => t.tamanho), ['36', '38', '40']);
+      expect(calca.estoqueTotal, 25);
+      expect(calca.menorPreco, 200);
+      expect(calca.maiorPreco, 210);
+      expect(modelos[2].tamanhos.map((t) => t.tamanho), ['P', 'GG']);
+    });
+
+    test('filtra por tipo, fornecedor, tamanho e disponibilidade', () {
+      expect(const FiltroProdutos(categorias: {'Jaqueta'}).aplicar(produtos).single.nome, 'Jaqueta Jeans');
+      expect(const FiltroProdutos(fornecedores: {'DZ'}).aplicar(produtos).length, 2);
+      expect(const FiltroProdutos(tamanhos: {'38'}).aplicar(produtos).single.tamanhos.single.idProduto, 3);
+      expect(const FiltroProdutos(disponibilidade: Disponibilidade.esgotado).aplicar(produtos).single.nome,
+          'Calca Flare de Lantejoulas');
+      final baixo = const FiltroProdutos(disponibilidade: Disponibilidade.estoqueBaixo).aplicar(produtos);
+      expect(baixo.map((m) => m.nome), ['Calca Flare de Lantejoulas', 'Jaqueta Jeans']);
+      expect(const FiltroProdutos(precoMaximo: 90).aplicar(produtos).single.nome, 'Bermuda');
+      expect(const FiltroProdutos(categorias: {'Jaqueta'}, tamanhos: {'G'}).aplicar(produtos), isEmpty);
+    });
+
+    test('ordena e conta os filtros ativos', () {
+      final porPreco = const FiltroProdutos(ordenacao: Ordenacao.menorPreco).aplicar(produtos);
+      expect(porPreco.first.nome, 'Bermuda');
+      final porEstoque = const FiltroProdutos(ordenacao: Ordenacao.maiorEstoque).aplicar(produtos);
+      expect(porEstoque.first.nome, 'Bermuda');
+      expect(const FiltroProdutos(categorias: {'A', 'B'}, disponibilidade: Disponibilidade.emEstoque).quantidade, 3);
+      expect(const FiltroProdutos(ordenacao: Ordenacao.maiorPreco).vazio, isTrue);
+    });
+
+    test('opcoes do filtro saem dos produtos carregados', () {
+      final opcoes = OpcoesFiltro.de(produtos);
+      expect(opcoes.categorias, ['Bermuda', 'Calca', 'Jaqueta']);
+      expect(opcoes.tamanhos, ['P', 'GG', '36', '38', '40', '42']);
+      expect(opcoes.menorPreco, 80);
+      expect(opcoes.maiorPreco, 210);
+    });
+  });
+
+  test('nivel de acesso e comparado sem acento', () {
+    expect(nivelSemAcento('Estratégico'), 'estrategico');
+    expect(nivelSemAcento('Tático'), 'tatico');
+    expect(nivelSemAcento(null), '');
   });
 }

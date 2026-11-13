@@ -157,7 +157,7 @@ flutter run --dart-define=API_URL=https://seu-servidor
 
 No login, os botões **Diretoria**, **Gerência** e **Vendas** preenchem os acessos de demonstração (senha `123456`). Para esconder numa versão de produção: `--dart-define=ESCONDER_DEMO=true`.
 
-O que o app faz: painel com anéis de meta e reposição; produtos com busca, leitor de código de barras, entrada de estoque e cadastro, edição e exclusão com foto pela câmera; clientes com ficha no estilo do app Contatos; pedidos com forma de pagamento e PIX copia e cola. Para apagar um cliente ou produto, use **Apagar** no fim da tela de edição ou arraste o item da lista para a esquerda (cliente: gerência e diretoria; produto: diretoria; quem já tem pedidos não pode ser apagado).
+O que o app faz: painel com anéis de meta e reposição, com cada indicador abrindo a tela correspondente (cada aba mantém a sua navegação e a barra inferior fica sempre visível); produtos agrupados por modelo, com os itens (tamanho e cor) dentro da tela do modelo, filtros por tipo, fornecedor, tamanho, cor, disponibilidade e preço, leitor de código de barras, entrada de estoque e cadastro, edição e exclusão com foto pela câmera; clientes com ficha no estilo do app Contatos; pedidos com forma de pagamento e PIX copia e cola. Para apagar um cliente ou produto, use **Apagar** no fim da tela de edição ou arraste o item da lista para a esquerda (cliente: gerência e diretoria; produto: diretoria; quem já tem pedidos não pode ser apagado).
 
 #### No iPhone (pelo cabo)
 

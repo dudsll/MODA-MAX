@@ -38,6 +38,7 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   Future<void> _adicionarProduto(List<Produto> produtos) async {
     final produto = await showModalBottomSheet<Produto>(
       context: context,
+      useRootNavigator: true,
       isScrollControlled: true,
       builder: (context) => SafeArea(
         child: ListView(

@@ -99,6 +99,7 @@ class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
       if (!mounted) return;
       final copiou = await showModalBottomSheet<bool>(
         context: context,
+        useRootNavigator: true,
         builder: (folha) => SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(20),
@@ -224,7 +225,7 @@ class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
             ),
           ],
           // Cancelar e permitido so aos niveis Estrategico e Tatico (mesma regra da API).
-          if (p.status != 'Cancelado' && ApiService.instancia.usuario?.nivel != 'Operacional') ...[
+          if (p.status != 'Cancelado' && ApiService.instancia.podeGerenciarEstoque) ...[
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: _cancelando ? null : _cancelar,

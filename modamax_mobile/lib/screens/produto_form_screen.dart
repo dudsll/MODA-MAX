@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../codigo_barras.dart';
+import '../config.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../widgets/comum.dart';
@@ -13,12 +14,18 @@ import 'produtos_screen.dart';
 ///
 /// Fecha devolvendo true quando algo mudou, para a lista ser recarregada.
 class ProdutoFormScreen extends StatefulWidget {
+  /// Tamanho que esta sendo editado (null para cadastrar).
   final Produto? produto;
 
-  const ProdutoFormScreen({super.key, this.produto});
+  /// Ao adicionar um item a um modelo (outro tamanho e/ou outra cor): nome, cor, preco,
+  /// categoria, fornecedor e foto vem preenchidos a partir deste produto; o usuario informa
+  /// o tamanho, ajusta a cor se for o caso e o estoque.
+  final Produto? modelo;
 
-  static Future<bool?> abrir(BuildContext context, {Produto? produto}) => Navigator.of(context)
-      .push<bool>(MaterialPageRoute(builder: (_) => ProdutoFormScreen(produto: produto)));
+  const ProdutoFormScreen({super.key, this.produto, this.modelo});
+
+  static Future<bool?> abrir(BuildContext context, {Produto? produto, Produto? modelo}) => Navigator.of(context)
+      .push<bool>(MaterialPageRoute(builder: (_) => ProdutoFormScreen(produto: produto, modelo: modelo)));
 
   @override
   State<ProdutoFormScreen> createState() => _ProdutoFormScreenState();
@@ -27,12 +34,13 @@ class ProdutoFormScreen extends StatefulWidget {
 class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
   final _form = GlobalKey<FormState>();
   late final Produto? _original = widget.produto;
-  late final _nome = TextEditingController(text: _original?.nome);
-  late final _descricao = TextEditingController(text: _original?.descricao);
+  late final Produto? _base = widget.produto ?? widget.modelo;
+  late final _nome = TextEditingController(text: _base?.nome);
+  late final _descricao = TextEditingController(text: _base?.descricao);
   late final _tamanho = TextEditingController(text: _original?.tamanho);
-  late final _cor = TextEditingController(text: _original?.cor);
+  late final _cor = TextEditingController(text: _base?.cor);
   late final _preco = TextEditingController(
-      text: _original == null ? '' : _original.preco.toStringAsFixed(2).replaceAll('.', ','));
+      text: _base == null ? '' : _base.preco.toStringAsFixed(2).replaceAll('.', ','));
   late final _estoque = TextEditingController(text: '${_original?.estoque ?? 0}');
   late final _codigo = TextEditingController(text: _original?.codigoBarras);
 
@@ -48,9 +56,9 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
   Future<(List<Categoria>, List<Fornecedor>)> _carregarOpcoes() async {
     final categorias = await ApiService.instancia.categorias();
     final fornecedores = await ApiService.instancia.fornecedores();
-    final original = _original;
-    _idCategoria ??= original != null && original.idCategoria != 0 ? original.idCategoria : null;
-    _idFornecedor ??= original != null && original.idFornecedor != 0 ? original.idFornecedor : null;
+    final base = _base;
+    _idCategoria ??= base != null && base.idCategoria != 0 ? base.idCategoria : null;
+    _idFornecedor ??= base != null && base.idFornecedor != 0 ? base.idFornecedor : null;
     return (categorias, fornecedores);
   }
 
@@ -65,6 +73,7 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
   Future<void> _escolherFoto() async {
     final origem = await showModalBottomSheet<ImageSource>(
       context: context,
+      useRootNavigator: true,
       builder: (_) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -119,12 +128,20 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
       _alterado = true;
 
       final foto = _novaFoto;
+      final fotoDoModelo = widget.modelo?.enderecoFoto(apiBaseUrl);
       if (foto != null) {
         produto = await ApiService.instancia.enviarFotoProduto(produto.idProduto, await foto.readAsBytes(), foto.name);
+      } else if (!_editando && fotoDoModelo != null) {
+        // Novo item de um modelo: reaproveita a foto do modelo (pode ser trocada depois).
+        final bytes = await ApiService.instancia.baixarFoto(fotoDoModelo);
+        if (bytes != null) {
+          produto = await ApiService.instancia.enviarFotoProduto(
+              produto.idProduto, bytes, fotoDoModelo.split('/').last);
+        }
       }
 
       if (!mounted) return;
-      mostrarMensagem(context, _editando ? 'Produto atualizado.' : 'Produto cadastrado.');
+      mostrarMensagem(context, _editando ? 'Produto atualizado.' : widget.modelo != null ? 'Item adicionado.' : 'Produto cadastrado.');
       Navigator.of(context).pop(true);
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.mensagem);
@@ -151,7 +168,7 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
         if (!saiu) Navigator.of(context).pop(_alterado);
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(_editando ? 'Editar produto' : 'Novo produto')),
+        appBar: AppBar(title: Text(_editando ? 'Editar item' : widget.modelo != null ? 'Novo item' : 'Novo produto')),
         body: FutureBuilder<(List<Categoria>, List<Fornecedor>)>(
           future: _opcoes,
           builder: (context, snapshot) {
@@ -177,7 +194,7 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  Center(child: _Foto(original: _original, nova: _novaFoto, aoTocar: _escolherFoto)),
+                  Center(child: _Foto(original: _base, nova: _novaFoto, aoTocar: _escolherFoto)),
                   const SizedBox(height: 20),
                   TextFormField(
                     controller: _nome,
@@ -283,7 +300,7 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
                     child: _salvando
                         ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Text(_editando ? 'Salvar alterações' : 'Cadastrar produto'),
+                        : Text(_editando ? 'Salvar alterações' : widget.modelo != null ? 'Adicionar item' : 'Cadastrar produto'),
                   ),
                   if (_editando && ApiService.instancia.podeExcluirProduto) ...[
                     const SizedBox(height: 32),

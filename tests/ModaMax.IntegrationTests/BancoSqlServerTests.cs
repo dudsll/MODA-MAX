@@ -20,7 +20,8 @@ public class BancoSqlServerTests
     private async Task<Produto> ProdutoAsync(string nome)
     {
         await using var contexto = _banco.NovoContexto();
-        return await contexto.Produtos.AsNoTracking().SingleAsync(p => p.Nome == nome);
+        // Cada modelo tem varios tamanhos: o primeiro cadastrado e o produto original da base.
+        return await contexto.Produtos.AsNoTracking().Where(p => p.Nome == nome).OrderBy(p => p.IdProduto).FirstAsync();
     }
 
     [FactSqlServer]
@@ -69,10 +70,12 @@ public class BancoSqlServerTests
     [FactSqlServer]
     public async Task Procedure_de_estoque_baixo_lista_so_os_produtos_abaixo_do_limite()
     {
+        int saiaId;
         await using (var preparo = _banco.NovoContexto())
         {
-            var saia = await preparo.Produtos.SingleAsync(p => p.Nome == "Saia Jeans");
+            var saia = await preparo.Produtos.Where(p => p.Nome == "Saia Jeans").OrderBy(p => p.IdProduto).FirstAsync();
             saia.Estoque = 3;
+            saiaId = saia.IdProduto;
             await preparo.SaveChangesAsync();
         }
 
@@ -81,7 +84,7 @@ public class BancoSqlServerTests
             .SqlQuery<modamax.web.Dtos.EstoqueBaixoDto>($"EXEC dbo.sp_ProdutosEstoqueBaixo @Limite = {5}")
             .ToListAsync();
 
-        Assert.Contains(produtos, p => p.Nome == "Saia Jeans" && p.Estoque == 3);
+        Assert.Contains(produtos, p => p.IdProduto == saiaId && p.Estoque == 3);
         Assert.All(produtos, p => Assert.True(p.Estoque <= 5));
     }
 
@@ -107,7 +110,7 @@ public class BancoSqlServerTests
     {
         await using (var contexto = _banco.NovoContexto())
         {
-            var blusa = await contexto.Produtos.SingleAsync(p => p.Nome == "Blusa Jeans");
+            var blusa = await contexto.Produtos.Where(p => p.Nome == "Blusa Jeans").OrderBy(p => p.IdProduto).FirstAsync();
             blusa.Preco += 1.50m;
             await contexto.SaveChangesAsync();
         }
@@ -155,7 +158,7 @@ public class BancoSqlServerTests
     public async Task Restricao_check_impede_estoque_negativo()
     {
         await using var contexto = _banco.NovoContexto();
-        var calca = await contexto.Produtos.SingleAsync(p => p.Nome == "Calca Jeans");
+        var calca = await contexto.Produtos.Where(p => p.Nome == "Calca Jeans").OrderBy(p => p.IdProduto).FirstAsync();
         calca.Estoque = -1;
 
         var erro = await Assert.ThrowsAsync<DbUpdateException>(() => contexto.SaveChangesAsync());

@@ -7,6 +7,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config.dart';
 import '../models.dart';
 
+/// "Estratégico" -> "estrategico": compara niveis de acesso sem depender de acento.
+String nivelSemAcento(String? nivel) {
+  const trocas = {'á': 'a', 'à': 'a', 'â': 'a', 'ã': 'a', 'é': 'e', 'ê': 'e', 'í': 'i', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ú': 'u', 'ç': 'c'};
+  return (nivel ?? '').trim().toLowerCase().split('').map((c) => trocas[c] ?? c).join();
+}
+
 class ApiException implements Exception {
   final String mensagem;
   final int? statusCode;
@@ -148,11 +154,14 @@ class ApiService {
     return (json as Map<String, dynamic>)['estoque'] as int;
   }
 
+  /// Nivel sem acento e em minusculas: a API devolve "Estratégico", "Tático" e "Operacional".
+  String get _nivel => nivelSemAcento(usuario?.nivel);
+
   /// Gerentes e diretoria podem dar entrada no estoque, cadastrar produtos e cancelar pedidos.
-  bool get podeGerenciarEstoque => usuario != null && usuario!.nivel != 'Operacional';
+  bool get podeGerenciarEstoque => _nivel == 'estrategico' || _nivel == 'tatico';
 
   /// Somente a diretoria exclui produtos (mesma regra da API e da Web).
-  bool get podeExcluirProduto => usuario?.nivel == 'Estrategico';
+  bool get podeExcluirProduto => _nivel == 'estrategico';
 
   /// Gerencia e diretoria excluem clientes (a API recusa quem ja tem pedidos).
   bool get podeExcluirCliente => podeGerenciarEstoque;
@@ -180,6 +189,16 @@ class ApiService {
   }
 
   Future<void> excluirProduto(int id) => _enviar('DELETE', '/api/produtos/$id');
+
+  /// Baixa a foto de um produto (para reaproveita-la num novo tamanho do mesmo modelo).
+  Future<Uint8List?> baixarFoto(String endereco) async {
+    try {
+      final resposta = await http.get(Uri.parse(endereco)).timeout(const Duration(seconds: 15));
+      return resposta.statusCode == 200 ? resposta.bodyBytes : null;
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Envia a foto (JPG, PNG ou WebP de ate 2 MB; a API confere o conteudo do arquivo).
   Future<Produto> enviarFotoProduto(int id, Uint8List bytes, String nomeArquivo) async {

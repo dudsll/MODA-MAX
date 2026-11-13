@@ -28,7 +28,7 @@ class CarregarDados<T> extends StatelessWidget {
             WidgetsBinding.instance.addPostFrameCallback((_) async {
               await ApiService.instancia.logout();
               if (!context.mounted) return;
-              Navigator.of(context).pushAndRemoveUntil(
+              Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
                 (_) => false,
               );

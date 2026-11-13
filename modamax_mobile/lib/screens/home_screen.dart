@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models.dart';
 import '../services/api_service.dart';
@@ -11,6 +12,10 @@ import 'pedidos_screen.dart';
 import 'produtos_screen.dart';
 
 /// Tela principal com navegacao inferior: Painel, Produtos, Clientes e Pedidos.
+///
+/// Cada aba tem a sua propria pilha de telas (como as abas dos apps do iPhone): abrir um
+/// produto, um cliente ou um pedido mantem a barra inferior visivel, e tocar de novo na aba
+/// volta para o inicio dela.
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -20,51 +25,115 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _aba = 0;
+  final _navegadores = List.generate(4, (_) => GlobalKey<NavigatorState>());
+  final _produtos = GlobalKey<ProdutosScreenState>();
 
+  static const _painel = 0, _abaProdutos = 1, _abaClientes = 2, _abaPedidos = 3;
   static const _titulos = ['Painel', 'Produtos', 'Clientes', 'Pedidos'];
 
   Future<void> _sair() async {
     await ApiService.instancia.logout();
     if (!mounted) return;
-    Navigator.of(context).pushAndRemoveUntil(
+    Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
       MaterialPageRoute(builder: (_) => const LoginScreen()),
       (_) => false,
     );
   }
 
+  /// Vai para a aba, voltando ao inicio dela.
+  void _irPara(int aba) {
+    _navegadores[aba].currentState?.popUntil((rota) => rota.isFirst);
+    setState(() => _aba = aba);
+  }
+
+  void _tocarAba(int aba) {
+    if (aba == _aba) {
+      _navegadores[aba].currentState?.popUntil((rota) => rota.isFirst);
+    } else {
+      setState(() => _aba = aba);
+    }
+  }
+
+  void _mostrarEstoqueBaixo() {
+    _irPara(_abaProdutos);
+    _produtos.currentState?.mostrarEstoqueBaixo();
+  }
+
+  /// Abre o produto dentro da aba Produtos (a barra inferior continua na tela).
+  Future<void> _abrirProduto(String nome) async {
+    _irPara(_abaProdutos);
+    final mudou = await _navegadores[_abaProdutos].currentState?.push<bool>(
+      MaterialPageRoute(builder: (_) => ProdutoModeloScreen(nome: nome)),
+    );
+    if (mudou == true) _produtos.currentState?.recarregar();
+  }
+
+  Widget _construirAba(int indice, Widget raiz) => Navigator(
+        key: _navegadores[indice],
+        onGenerateRoute: (_) => MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: AppBar(
+              title: Text(_titulos[indice]),
+              actions: [IconButton(tooltip: 'Sair', icon: const Icon(Icons.logout), onPressed: _sair)],
+            ),
+            body: raiz,
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
-    final paginas = [
-      const _PainelTab(),
-      const ProdutosScreen(),
-      const ClientesScreen(),
-      const PedidosScreen(),
-    ];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_titulos[_aba]),
-        actions: [
-          IconButton(tooltip: 'Sair', icon: const Icon(Icons.logout), onPressed: _sair),
-        ],
-      ),
-      body: IndexedStack(index: _aba, children: paginas),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _aba,
-        onDestinationSelected: (i) => setState(() => _aba = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Painel'),
-          NavigationDestination(icon: Icon(Icons.checkroom_outlined), label: 'Produtos'),
-          NavigationDestination(icon: Icon(Icons.people_outline), label: 'Clientes'),
-          NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'Pedidos'),
-        ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (saiu, _) async {
+        if (saiu) return;
+        // Botao voltar do Android: primeiro volta dentro da aba, depois para o Painel.
+        final navegador = _navegadores[_aba].currentState;
+        if (navegador != null && await navegador.maybePop()) return;
+        if (_aba != _painel) {
+          setState(() => _aba = _painel);
+        } else {
+          await SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        body: IndexedStack(
+          index: _aba,
+          children: [
+            _construirAba(
+              _painel,
+              _PainelTab(
+                aoAbrirAba: _irPara,
+                aoMostrarEstoqueBaixo: _mostrarEstoqueBaixo,
+                aoAbrirProduto: _abrirProduto,
+              ),
+            ),
+            _construirAba(_abaProdutos, ProdutosScreen(key: _produtos)),
+            _construirAba(_abaClientes, const ClientesScreen()),
+            _construirAba(_abaPedidos, const PedidosScreen()),
+          ],
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _aba,
+          onDestinationSelected: _tocarAba,
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Painel'),
+            NavigationDestination(icon: Icon(Icons.checkroom_outlined), label: 'Produtos'),
+            NavigationDestination(icon: Icon(Icons.people_outline), label: 'Clientes'),
+            NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'Pedidos'),
+          ],
+        ),
       ),
     );
   }
 }
 
 class _PainelTab extends StatefulWidget {
-  const _PainelTab();
+  final ValueChanged<int> aoAbrirAba;
+  final VoidCallback aoMostrarEstoqueBaixo;
+  final ValueChanged<String> aoAbrirProduto;
+
+  const _PainelTab({required this.aoAbrirAba, required this.aoMostrarEstoqueBaixo, required this.aoAbrirProduto});
 
   @override
   State<_PainelTab> createState() => _PainelTabState();
@@ -132,15 +201,21 @@ class _PainelTabState extends State<_PainelTab> {
                 );
               },
             ),
-            _Indicador(icone: Icons.attach_money, titulo: 'Faturamento', valor: formatarMoeda(d.faturamentoTotal)),
-            _Indicador(icone: Icons.receipt_long, titulo: 'Pedidos', valor: '${d.totalPedidos}'),
-            _Indicador(icone: Icons.checkroom, titulo: 'Produtos', valor: '${d.totalProdutos}'),
-            _Indicador(icone: Icons.people, titulo: 'Clientes', valor: '${d.totalClientes}'),
+            _Indicador(
+              icone: Icons.attach_money,
+              titulo: 'Faturamento',
+              valor: formatarMoeda(d.faturamentoTotal),
+              aoTocar: () => widget.aoAbrirAba(3),
+            ),
+            _Indicador(icone: Icons.receipt_long, titulo: 'Pedidos', valor: '${d.totalPedidos}', aoTocar: () => widget.aoAbrirAba(3)),
+            _Indicador(icone: Icons.checkroom, titulo: 'Produtos', valor: '${d.totalProdutos}', aoTocar: () => widget.aoAbrirAba(1)),
+            _Indicador(icone: Icons.people, titulo: 'Clientes', valor: '${d.totalClientes}', aoTocar: () => widget.aoAbrirAba(2)),
             _Indicador(
               icone: Icons.warning_amber,
               titulo: 'Produtos com estoque baixo',
               valor: '${d.produtosEstoqueBaixo}',
               destaque: d.produtosEstoqueBaixo > 0,
+              aoTocar: widget.aoMostrarEstoqueBaixo,
             ),
             const SizedBox(height: 8),
             FutureBuilder<Dados<GraficosDashboard>>(
@@ -150,7 +225,11 @@ class _PainelTabState extends State<_PainelTab> {
                 final g = snapshot.data!.valor;
                 return Column(
                   children: [
-                    _CartaoReposicao(futuro: _reposicao),
+                    _CartaoReposicao(
+                      futuro: _reposicao,
+                      aoVerTodos: widget.aoMostrarEstoqueBaixo,
+                      aoAbrirProduto: widget.aoAbrirProduto,
+                    ),
                     GraficoBarras(titulo: 'Faturamento por mês', pontos: g.vendasPorMes, formatar: formatarMoeda),
                     GraficoBarras(
                       titulo: 'Mais vendidos',
@@ -174,18 +253,33 @@ class _Indicador extends StatelessWidget {
   final String titulo;
   final String valor;
   final bool destaque;
+  final VoidCallback aoTocar;
 
-  const _Indicador({required this.icone, required this.titulo, required this.valor, this.destaque = false});
+  const _Indicador({
+    required this.icone,
+    required this.titulo,
+    required this.valor,
+    required this.aoTocar,
+    this.destaque = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;
     return Card(
       color: destaque ? cores.errorContainer : null,
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
+        onTap: aoTocar,
         leading: Icon(icone),
         title: Text(titulo),
-        trailing: Text(valor, style: Theme.of(context).textTheme.titleMedium),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(valor, style: Theme.of(context).textTheme.titleMedium),
+            const Icon(Icons.chevron_right),
+          ],
+        ),
       ),
     );
   }
@@ -194,8 +288,10 @@ class _Indicador extends StatelessWidget {
 /// Produtos que acabam antes da proxima entrega, vindos da central de reposicao da API.
 class _CartaoReposicao extends StatelessWidget {
   final Future<Dados<List<ItemReposicao>>> futuro;
+  final VoidCallback aoVerTodos;
+  final ValueChanged<String> aoAbrirProduto;
 
-  const _CartaoReposicao({required this.futuro});
+  const _CartaoReposicao({required this.futuro, required this.aoVerTodos, required this.aoAbrirProduto});
 
   @override
   Widget build(BuildContext context) {
@@ -207,10 +303,13 @@ class _CartaoReposicao extends StatelessWidget {
         final cores = Theme.of(context).colorScheme;
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ListTile(
+                onTap: aoVerTodos,
+                trailing: const Icon(Icons.chevron_right),
                 leading: Icon(Icons.inventory_2_outlined, color: cores.primary),
                 title: const Text('Precisam de reposição'),
                 subtitle: Text(repor.isEmpty ? 'Todos os produtos estão com estoque em dia.' : '${repor.length} produto(s) pela previsão de vendas'),
@@ -218,6 +317,7 @@ class _CartaoReposicao extends StatelessWidget {
               for (final r in repor.take(4))
                 ListTile(
                   dense: true,
+                  onTap: () => aoAbrirProduto(r.produto),
                   leading: Icon(Icons.circle, size: 12, color: r.critico ? Colors.red : Colors.orange,
                       semanticLabel: r.critico ? 'Crítico' : 'Atenção'),
                   title: Text(r.produto),
