@@ -5,6 +5,7 @@ import '../models.dart';
 import '../services/api_service.dart';
 import '../widgets/comum.dart';
 import 'leitor_screen.dart';
+import 'produto_form_screen.dart';
 
 class ProdutosScreen extends StatefulWidget {
   const ProdutosScreen({super.key});
@@ -17,8 +18,14 @@ class _ProdutosScreenState extends State<ProdutosScreen> {
   String? _busca;
   late Future<Dados<List<Produto>>> _futuro = ApiService.instancia.produtos();
 
+  // Apagados arrastando: saem da lista na hora, sem esperar recarregar.
+  final _apagados = <int>{};
+
   Future<void> _atualizar() async {
-    setState(() => _futuro = ApiService.instancia.produtos(busca: _busca));
+    setState(() {
+      _apagados.clear();
+      _futuro = ApiService.instancia.produtos(busca: _busca);
+    });
     await _futuro;
   }
 
@@ -41,8 +48,25 @@ class _ProdutosScreenState extends State<ProdutosScreen> {
     }
   }
 
+  /// Abre o cadastro (sem produto) ou a edicao e recarrega a lista se algo mudou.
+  Future<void> _abrirFormulario([Produto? produto]) async {
+    final mudou = await ProdutoFormScreen.abrir(context, produto: produto);
+    if (mudou == true) await _atualizar();
+  }
+
+  /// Gerencia e diretoria editam o produto; vendedores veem a ficha.
+  Future<void> _tocarProduto(Produto produto) async {
+    if (ApiService.instancia.podeGerenciarEstoque) return _abrirFormulario(produto);
+    await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => FichaProduto(produto: produto),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final podeCadastrar = ApiService.instancia.podeGerenciarEstoque;
     return CarregarDados<List<Produto>>(
       futuro: _futuro,
       aoAtualizar: _atualizar,
@@ -57,15 +81,38 @@ class _ProdutosScreenState extends State<ProdutosScreen> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: OutlinedButton.icon(
-              onPressed: _lerCodigo,
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Ler código de barras'),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _lerCodigo,
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Ler código'),
+                  ),
+                ),
+                if (podeCadastrar) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _abrirFormulario(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Novo produto'),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
           if (dados.valor.isEmpty) const ListTile(title: Text('Nenhum produto encontrado.')),
-          for (final p in dados.valor) _ProdutoTile(produto: p),
+          for (final p in dados.valor.where((p) => !_apagados.contains(p.idProduto)))
+            ArrastarParaApagar(
+              chave: ValueKey('produto-${p.idProduto}'),
+              permitido: !dados.doCache && ApiService.instancia.podeExcluirProduto,
+              aoApagar: () => apagarProduto(context, p),
+              aoRemover: () => setState(() => _apagados.add(p.idProduto)),
+              child: _ProdutoTile(produto: p, aoTocar: () => _tocarProduto(p)),
+            ),
         ],
       ),
     );
@@ -101,8 +148,9 @@ class FotoProduto extends StatelessWidget {
 
 class _ProdutoTile extends StatelessWidget {
   final Produto produto;
+  final VoidCallback aoTocar;
 
-  const _ProdutoTile({required this.produto});
+  const _ProdutoTile({required this.produto, required this.aoTocar});
 
   @override
   Widget build(BuildContext context) {
@@ -113,6 +161,7 @@ class _ProdutoTile extends StatelessWidget {
       label: '${produto.nome}, ${formatarMoeda(produto.preco)}, ${produto.estoque} em estoque',
       excludeSemantics: true,
       child: ListTile(
+        onTap: aoTocar,
         leading: FotoProduto(produto: produto),
         title: Text(produto.nome),
         subtitle: Text('${produto.categoria ?? ''} - ${produto.cor} - Tam. ${produto.tamanho}'),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modamax_mobile/codigo_barras.dart';
 import 'package:modamax_mobile/models.dart';
+import 'package:modamax_mobile/screens/clientes_screen.dart';
+import 'package:modamax_mobile/screens/produto_form_screen.dart';
 import 'package:modamax_mobile/widgets/aneis.dart';
 
 void main() {
@@ -119,5 +121,29 @@ void main() {
     expect(find.text('64%'), findsOneWidget);
     expect(find.text('69%'), findsOneWidget);
     expect(find.text('Peças'), findsOneWidget);
+  });
+
+  test('preco do formulario de produto aceita virgula e ponto', () {
+    expect(lerPreco('129,90'), 129.90);
+    expect(lerPreco('1.299,90'), 1299.90);
+    expect(lerPreco('129.90'), 129.90);
+    expect(lerPreco('R\$ 59,00'), 59.0);
+    expect(lerPreco('abc'), isNull);
+  });
+
+  test('produto le categoria e fornecedor da API', () {
+    final p = Produto.fromJson({
+      'idProduto': 1, 'nome': 'Calca', 'tamanho': '40', 'cor': 'Azul', 'preco': 99.9, 'estoque': 3,
+      'idCategoria': 2, 'categoria': 'Calca', 'idFornecedor': 5, 'fornecedor': 'DZ',
+    });
+    expect(p.idCategoria, 2);
+    expect(p.idFornecedor, 5);
+  });
+
+  test('iniciais do avatar do cliente seguem o app Contatos', () {
+    expect(iniciais('Gabriel Mancini'), 'GM');
+    expect(iniciais('Amanda da Silva'), 'AS');
+    expect(iniciais('loja'), 'L');
+    expect(iniciais('  '), '?');
   });
 }

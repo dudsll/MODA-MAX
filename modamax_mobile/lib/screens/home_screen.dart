@@ -103,8 +103,8 @@ class _PainelTabState extends State<_PainelTab> {
           padding: const EdgeInsets.all(16),
           children: [
             if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
-            Text('Ola, ${usuario?.nome ?? ''}', style: Theme.of(context).textTheme.titleLarge),
-            Text('Nivel de acesso: ${usuario?.nivel ?? '-'}'),
+            Text('Olá, ${usuario?.nome ?? ''}', style: Theme.of(context).textTheme.titleLarge),
+            Text('Nível de acesso: ${usuario?.nivel ?? '-'}'),
             const SizedBox(height: 16),
             FutureBuilder<Dados<MetaAtual>>(
               future: _meta,
@@ -151,7 +151,7 @@ class _PainelTabState extends State<_PainelTab> {
                 return Column(
                   children: [
                     _CartaoReposicao(futuro: _reposicao),
-                    GraficoBarras(titulo: 'Faturamento por mes', pontos: g.vendasPorMes, formatar: formatarMoeda),
+                    GraficoBarras(titulo: 'Faturamento por mês', pontos: g.vendasPorMes, formatar: formatarMoeda),
                     GraficoBarras(
                       titulo: 'Mais vendidos',
                       pontos: g.produtosMaisVendidos,

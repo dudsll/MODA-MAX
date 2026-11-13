@@ -67,7 +67,7 @@ class AvisoOffline extends StatelessWidget {
   Widget build(BuildContext context) {
     final quando = sincronizadoEm == null
         ? ''
-        : ' Ultima sincronizacao: ${formatarData(sincronizadoEm!)} '
+        : ' Última sincronização: ${formatarData(sincronizadoEm!)} '
             '${sincronizadoEm!.hour.toString().padLeft(2, '0')}:${sincronizadoEm!.minute.toString().padLeft(2, '0')}.';
 
     return Card(
@@ -108,3 +108,116 @@ class CampoBusca extends StatelessWidget {
 void mostrarMensagem(BuildContext context, String mensagem) {
   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensagem)));
 }
+
+/// Botao principal de cadastro no topo das listas (Produtos, Clientes, Pedidos): largura
+/// total e cantos arredondados, no estilo dos apps do iPhone, em vez de botao flutuante.
+class BotaoNovo extends StatelessWidget {
+  final String texto;
+  final VoidCallback? aoTocar;
+
+  const BotaoNovo({super.key, required this.texto, required this.aoTocar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: FilledButton.icon(
+        onPressed: aoTocar,
+        icon: const Icon(Icons.add),
+        label: Text(texto),
+      ),
+    );
+  }
+}
+
+/// Pergunta antes de excluir; devolve true so quando o usuario confirma.
+Future<bool> confirmarExclusao(BuildContext context, {required String titulo, required String mensagem}) async {
+  final resposta = await showDialog<bool>(
+    context: context,
+    builder: (contexto) => AlertDialog(
+      title: Text(titulo),
+      content: Text(mensagem),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(contexto, false), child: const Text('Cancelar')),
+        FilledButton(
+          style: FilledButton.styleFrom(backgroundColor: Theme.of(contexto).colorScheme.error),
+          onPressed: () => Navigator.pop(contexto, true),
+          child: const Text('Excluir'),
+        ),
+      ],
+    ),
+  );
+  return resposta == true;
+}
+
+/// Botao vermelho de apagar no fim da tela de edicao, como "Apagar Contato" no app Contatos.
+class BotaoApagar extends StatelessWidget {
+  final String texto;
+  final VoidCallback? aoTocar;
+
+  const BotaoApagar({super.key, required this.texto, required this.aoTocar});
+
+  @override
+  Widget build(BuildContext context) {
+    final cores = Theme.of(context).colorScheme;
+    return Material(
+      color: cores.surface,
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: aoTocar,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Text(texto, style: TextStyle(color: cores.error, fontSize: 17)),
+        ),
+      ),
+    );
+  }
+}
+
+/// Item de lista que pode ser apagado arrastando para a esquerda (aparece a lixeira vermelha).
+/// [aoApagar] pede a confirmacao e chama a API; devolve true se apagou.
+class ArrastarParaApagar extends StatelessWidget {
+  final Key chave;
+  final bool permitido;
+  final Future<bool> Function() aoApagar;
+  final VoidCallback aoRemover;
+  final Widget child;
+
+  const ArrastarParaApagar({
+    super.key,
+    required this.chave,
+    required this.permitido,
+    required this.aoApagar,
+    required this.aoRemover,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!permitido) return child;
+    return Dismissible(
+      key: chave,
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => aoApagar(),
+      onDismissed: (_) => aoRemover(),
+      background: Container(
+        color: Theme.of(context).colorScheme.error,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 24),
+        child: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.delete_outline, color: Colors.white),
+            SizedBox(height: 2),
+            Text('Apagar', style: TextStyle(color: Colors.white, fontSize: 12)),
+          ],
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Como uma tela de edicao terminou: salvou as alteracoes ou apagou o registro.
+enum ResultadoEdicao { salvo, apagado }

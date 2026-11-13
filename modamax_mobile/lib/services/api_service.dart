@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -147,8 +148,49 @@ class ApiService {
     return (json as Map<String, dynamic>)['estoque'] as int;
   }
 
-  /// Gerentes e diretoria podem dar entrada no estoque e cancelar pedidos.
+  /// Gerentes e diretoria podem dar entrada no estoque, cadastrar produtos e cancelar pedidos.
   bool get podeGerenciarEstoque => usuario != null && usuario!.nivel != 'Operacional';
+
+  /// Somente a diretoria exclui produtos (mesma regra da API e da Web).
+  bool get podeExcluirProduto => usuario?.nivel == 'Estrategico';
+
+  /// Gerencia e diretoria excluem clientes (a API recusa quem ja tem pedidos).
+  bool get podeExcluirCliente => podeGerenciarEstoque;
+
+  Future<void> excluirCliente(int id) => _enviar('DELETE', '/api/clientes/$id');
+
+  Future<Cliente> cliente(int id) async =>
+      Cliente.fromJson(await _enviar('GET', '/api/clientes/$id') as Map<String, dynamic>);
+
+  Future<List<Categoria>> categorias() async => ((await _enviar('GET', '/api/categorias')) as List)
+      .map((c) => Categoria.fromJson(c as Map<String, dynamic>))
+      .toList();
+
+  Future<List<Fornecedor>> fornecedores() async => ((await _enviar('GET', '/api/fornecedores')) as List)
+      .map((f) => Fornecedor.fromJson(f as Map<String, dynamic>))
+      .toList();
+
+  /// Cadastra (sem id) ou altera um produto e devolve o produto como ficou na API.
+  Future<Produto> salvarProduto(Map<String, dynamic> corpo, {int? id}) async {
+    if (id == null) {
+      return Produto.fromJson(await _enviar('POST', '/api/produtos', corpo: corpo) as Map<String, dynamic>);
+    }
+    await _enviar('PUT', '/api/produtos/$id', corpo: corpo);
+    return Produto.fromJson(await _enviar('GET', '/api/produtos/$id') as Map<String, dynamic>);
+  }
+
+  Future<void> excluirProduto(int id) => _enviar('DELETE', '/api/produtos/$id');
+
+  /// Envia a foto (JPG, PNG ou WebP de ate 2 MB; a API confere o conteudo do arquivo).
+  Future<Produto> enviarFotoProduto(int id, Uint8List bytes, String nomeArquivo) async {
+    final requisicao = http.MultipartRequest('POST', Uri.parse('$apiBaseUrl/api/produtos/$id/foto'))
+      ..headers['Accept'] = 'application/json'
+      ..files.add(http.MultipartFile.fromBytes('foto', bytes, filename: nomeArquivo));
+    if (_token != null) requisicao.headers['Authorization'] = 'Bearer $_token';
+    final resposta = await _executar(() async =>
+        http.Response.fromStream(await requisicao.send().timeout(const Duration(seconds: 30))));
+    return Produto.fromJson(resposta as Map<String, dynamic>);
+  }
 
   Future<Cliente> salvarCliente(Map<String, dynamic> corpo, {int? id}) async {
     if (id == null) {
@@ -192,20 +234,27 @@ class ApiService {
       if (autenticado && _token != null) 'Authorization': 'Bearer $_token',
     };
 
-    http.Response resposta;
-    try {
+    return _executar(() async {
       final requisicao = http.Request(metodo, uri)..headers.addAll(headers);
       if (corpo != null) requisicao.body = jsonEncode(corpo);
-      resposta = await http.Response.fromStream(await requisicao.send().timeout(const Duration(seconds: 15)));
+      return http.Response.fromStream(await requisicao.send().timeout(const Duration(seconds: 15)));
+    });
+  }
+
+  /// Executa a requisicao e converte a resposta (JSON ou erro em Problem Details).
+  Future<dynamic> _executar(Future<http.Response> Function() enviar) async {
+    http.Response resposta;
+    try {
+      resposta = await enviar();
     } catch (_) {
-      throw ApiException('Sem conexao com o servidor ModaMax.');
+      throw ApiException('Sem conexão com o servidor ModaMax.');
     }
 
     if (resposta.statusCode == 401) {
-      throw ApiException('Sessao expirada ou credenciais invalidas.', statusCode: 401);
+      throw ApiException('Sessão expirada ou credenciais inválidas.', statusCode: 401);
     }
     if (resposta.statusCode == 403) {
-      throw ApiException('Seu nivel de acesso nao permite esta operacao.', statusCode: 403);
+      throw ApiException('Seu nível de acesso não permite esta operação.', statusCode: 403);
     }
     if (resposta.statusCode >= 400) {
       throw ApiException(_mensagemDeErro(resposta), statusCode: resposta.statusCode);

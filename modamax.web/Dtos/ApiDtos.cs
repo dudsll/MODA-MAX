@@ -12,6 +12,8 @@ public record LoginResponse(string Token, DateTime ExpiraEm, int IdUsuario, stri
 
 public record CategoriaDto(int IdCategoria, string Nome);
 
+public record FornecedorDto(int IdFornecedor, string Nome);
+
 public record ProdutoDto(
     int IdProduto,
     string Nome,

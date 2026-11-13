@@ -30,6 +30,16 @@ class Categoria {
       Categoria(idCategoria: json['idCategoria'] as int, nome: json['nome'] as String);
 }
 
+class Fornecedor {
+  final int idFornecedor;
+  final String nome;
+
+  Fornecedor({required this.idFornecedor, required this.nome});
+
+  factory Fornecedor.fromJson(Map<String, dynamic> json) =>
+      Fornecedor(idFornecedor: json['idFornecedor'] as int, nome: json['nome'] as String);
+}
+
 class Produto {
   final int idProduto;
   final String nome;
@@ -38,7 +48,9 @@ class Produto {
   final String cor;
   final double preco;
   final int estoque;
+  final int idCategoria;
   final String? categoria;
+  final int idFornecedor;
   final String? fornecedor;
   final String? codigoBarras;
 
@@ -53,7 +65,9 @@ class Produto {
     required this.cor,
     required this.preco,
     required this.estoque,
+    this.idCategoria = 0,
     this.categoria,
+    this.idFornecedor = 0,
     this.fornecedor,
     this.codigoBarras,
     this.fotoUrl,
@@ -75,7 +89,9 @@ class Produto {
         cor: json['cor'] as String,
         preco: _decimal(json['preco']),
         estoque: json['estoque'] as int,
+        idCategoria: json['idCategoria'] as int? ?? 0,
         categoria: json['categoria'] as String?,
+        idFornecedor: json['idFornecedor'] as int? ?? 0,
         fornecedor: json['fornecedor'] as String?,
         codigoBarras: json['codigoBarras'] as String?,
         fotoUrl: json['fotoUrl'] as String?,

@@ -125,7 +125,7 @@ Na primeira execução as migrations criam as tabelas, procedures e triggers, e 
 dotnet test tests/ModaMax.Tests
 ```
 
-São 93 testes, com a aplicação rodando em memória (SQLite): regras de pedido e de pagamento, PIX (BR Code e CRC16), metas, central de reposição, Curva ABC, código de barras e desenho do EAN-13, bloqueio de login e limite de requisições, recuperação de senha, fotos, relatórios e exportações, e a API de ponta a ponta (permissões, Problem Details, pagamentos, metas, reposição, busca por código, envio de foto e arquivos do PWA).
+São 95 testes, com a aplicação rodando em memória (SQLite): regras de pedido e de pagamento, PIX (BR Code e CRC16), metas, central de reposição, Curva ABC, código de barras e desenho do EAN-13, bloqueio de login e limite de requisições, recuperação de senha, fotos, relatórios e exportações, e a API de ponta a ponta (permissões, Problem Details, pagamentos, metas, reposição, busca por código, cadastro e exclusão de produtos e clientes, envio de foto e arquivos do PWA).
 
 ```bash
 dotnet test tests/ModaMax.IntegrationTests
@@ -141,22 +141,43 @@ docker compose up -d --build
 
 ### 3. App mobile (Flutter)
 
+As pastas `android/` e `ios/` já estão no repositório, com a permissão de câmera, o acesso à API local por HTTP e o acesso à galeria para as fotos dos produtos.
+
 ```bash
 cd modamax_mobile
-flutter create . --platforms=android,ios --project-name modamax_mobile
 flutter pub get
 flutter run
 ```
-
-`flutter create .` só gera as pastas `android/` e `ios/` (não sobrescreve `lib/`). Como a API local usa HTTP, no Android adicione `android:usesCleartextTraffic="true"` na tag `<application>` de `android/app/src/main/AndroidManifest.xml`.
-
-O leitor de código de barras usa a câmera. No Android a permissão já vem do pacote `mobile_scanner`; no iOS, adicione a chave `NSCameraUsageDescription` (ex.: "Ler o código de barras das etiquetas") em `ios/Runner/Info.plist`. No emulador, use o botão "Digitar o código".
 
 O app usa `http://10.0.2.2:5248` no emulador Android e `http://localhost:5248` no simulador iOS. Para apontar para outro servidor:
 
 ```bash
 flutter run --dart-define=API_URL=https://seu-servidor
 ```
+
+No login, os botões **Diretoria**, **Gerência** e **Vendas** preenchem os acessos de demonstração (senha `123456`). Para esconder numa versão de produção: `--dart-define=ESCONDER_DEMO=true`.
+
+O que o app faz: painel com anéis de meta e reposição; produtos com busca, leitor de código de barras, entrada de estoque e cadastro, edição e exclusão com foto pela câmera; clientes com ficha no estilo do app Contatos; pedidos com forma de pagamento e PIX copia e cola. Para apagar um cliente ou produto, use **Apagar** no fim da tela de edição ou arraste o item da lista para a esquerda (cliente: gerência e diretoria; produto: diretoria; quem já tem pedidos não pode ser apagado).
+
+#### No iPhone (pelo cabo)
+
+1. Suba a API aceitando conexões da rede:
+
+```bash
+dotnet run --project modamax.web/modamax.web.csproj --launch-profile sqlite --urls http://0.0.0.0:5248
+```
+
+2. No Xcode, adicione o seu Apple ID em **Xcode > Settings > Accounts** (a conta gratuita serve; o app instalado vale por 7 dias).
+3. Ligue o iPhone no Mac pelo cabo, toque em **Confiar** e ative **Ajustes > Privacidade e Segurança > Modo de Desenvolvedor**.
+4. Rode o script, que compila, assina com a sua conta e instala o app usando o IP do Mac na rede:
+
+```bash
+./modamax_mobile/preparar_iphone.sh
+```
+
+5. Na primeira vez, confie no seu perfil em **Ajustes > Geral > VPN e Gerenciamento de Dispositivo** e permita o acesso à rede local quando o app pedir.
+
+O script compila uma cópia em `~/Developer/ModaMax-mobile`: pastas sincronizadas com o iCloud (como Documentos) deixam atributos nos arquivos que impedem o Xcode de assinar o app. O Team da conta Apple é gravado só nessa cópia, nunca no repositório.
 
 ## Banco de dados
 
@@ -193,6 +214,7 @@ Códigos usados: 400 (dados inválidos), 401 (sem login ou senha errada), 403 (n
 | POST | `/api/auth/login` | Autentica e devolve o token JWT |
 | GET | `/api/dashboard` | Indicadores gerais |
 | GET | `/api/categorias` | Categorias |
+| GET | `/api/fornecedores` | Fornecedores (formulário de produto do app) |
 | GET/POST | `/api/produtos` | Lista (filtros `busca`, `categoriaId`, `somenteDisponiveis`) e cadastra |
 | GET/PUT/DELETE | `/api/produtos/{id}` | Consulta, altera e exclui |
 | GET | `/api/produtos/codigo/{codigo}` | Produto pelo código de barras (leitor do app) |
@@ -274,7 +296,7 @@ O sistema Web tem manifesto e service worker: no Chrome/Edge aparece "Instalar M
 
 O workflow `.github/workflows/ci.yml` roda a cada push/pull request:
 
-1. compila a Web/API, roda os 93 testes, sobe um SQL Server em container para os 14 testes de integração e gera o script do banco a partir das migrations;
+1. compila a Web/API, roda os 95 testes, sobe um SQL Server em container para os 14 testes de integração e gera o script do banco a partir das migrations;
 2. roda `flutter analyze` e `flutter test` no app mobile;
 3. monta a imagem Docker da aplicação.
 

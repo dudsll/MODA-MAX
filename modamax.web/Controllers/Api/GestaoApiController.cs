@@ -57,6 +57,17 @@ public class GestaoApiController : ControllerBase
             .ToListAsync();
     }
 
+    // GET /api/fornecedores  (formulario de produto do app)
+    [HttpGet("fornecedores")]
+    public async Task<ActionResult<IEnumerable<FornecedorDto>>> Fornecedores()
+    {
+        return await _context.Fornecedores
+            .AsNoTracking()
+            .OrderBy(f => f.Nome)
+            .Select(f => new FornecedorDto(f.IdFornecedor, f.Nome))
+            .ToListAsync();
+    }
+
     // GET /api/dashboard
     [HttpGet("dashboard")]
     public async Task<ActionResult<DashboardDto>> Dashboard()

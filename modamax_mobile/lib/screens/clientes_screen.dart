@@ -4,6 +4,27 @@ import '../models.dart';
 import '../services/api_service.dart';
 import '../widgets/comum.dart';
 
+/// Pergunta e apaga o cliente pela API. A API recusa clientes que ja fizeram pedidos
+/// (para nao apagar o historico de vendas); nesse caso mostra o aviso e devolve false.
+Future<bool> apagarCliente(BuildContext context, Cliente cliente) async {
+  final confirmar = await confirmarExclusao(
+    context,
+    titulo: 'Apagar cliente?',
+    mensagem: '${cliente.nome} será removido. Clientes que já fizeram pedidos não podem ser apagados, '
+        'para não perder o histórico de vendas.',
+  );
+  if (!confirmar || !context.mounted) return false;
+
+  try {
+    await ApiService.instancia.excluirCliente(cliente.idCliente);
+    if (context.mounted) mostrarMensagem(context, 'Cliente apagado.');
+    return true;
+  } on ApiException catch (e) {
+    if (context.mounted) mostrarMensagem(context, e.mensagem);
+    return false;
+  }
+}
+
 class ClientesScreen extends StatefulWidget {
   const ClientesScreen({super.key});
 
@@ -15,50 +36,155 @@ class _ClientesScreenState extends State<ClientesScreen> {
   String? _busca;
   late Future<Dados<List<Cliente>>> _futuro = ApiService.instancia.clientes();
 
+  // Apagados arrastando: saem da lista na hora, sem esperar recarregar.
+  final _apagados = <int>{};
+
   Future<void> _atualizar() async {
-    setState(() => _futuro = ApiService.instancia.clientes(busca: _busca));
+    setState(() {
+      _apagados.clear();
+      _futuro = ApiService.instancia.clientes(busca: _busca);
+    });
     await _futuro;
   }
 
-  Future<void> _abrirFormulario([Cliente? cliente]) async {
-    final salvou = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (_) => ClienteFormScreen(cliente: cliente)),
+  Future<void> _novoCliente() async {
+    final salvou = await Navigator.of(context).push<ResultadoEdicao>(
+      MaterialPageRoute(builder: (_) => const ClienteFormScreen()),
     );
-    if (salvou == true) _atualizar();
+    if (salvou != null) _atualizar();
+  }
+
+  Future<void> _abrirFicha(Cliente cliente) async {
+    final mudou = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ClienteDetalheScreen(cliente: cliente)),
+    );
+    if (mudou == true) _atualizar();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _abrirFormulario(),
-        icon: const Icon(Icons.person_add),
-        label: const Text('Novo cliente'),
-      ),
       body: CarregarDados<List<Cliente>>(
         futuro: _futuro,
         aoAtualizar: _atualizar,
-        construir: (dados) => ListView(
-          padding: const EdgeInsets.only(bottom: 88),
-          children: [
-            CampoBusca(
-              dica: 'Buscar por nome ou documento',
-              aoBuscar: (texto) {
-                _busca = texto;
-                _atualizar();
-              },
-            ),
-            if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
-            if (dados.valor.isEmpty) const ListTile(title: Text('Nenhum cliente encontrado.')),
-            for (final c in dados.valor)
-              ListTile(
-                leading: CircleAvatar(child: Text(c.nome.isEmpty ? '?' : c.nome[0])),
-                title: Text(c.nome),
-                subtitle: Text('${c.tipo} ${c.documento}\n${c.email}'),
-                isThreeLine: true,
-                trailing: const Icon(Icons.edit_outlined),
-                onTap: dados.doCache ? null : () => _abrirFormulario(c),
+        construir: (dados) {
+          final clientes = dados.valor.where((c) => !_apagados.contains(c.idCliente)).toList();
+          return ListView(
+            children: [
+              CampoBusca(
+                dica: 'Buscar por nome ou documento',
+                aoBuscar: (texto) {
+                  _busca = texto;
+                  _atualizar();
+                },
               ),
+              BotaoNovo(texto: 'Novo cliente', aoTocar: dados.doCache ? null : _novoCliente),
+              if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
+              if (clientes.isEmpty) const ListTile(title: Text('Nenhum cliente encontrado.')),
+              for (final c in clientes)
+                ArrastarParaApagar(
+                  chave: ValueKey('cliente-${c.idCliente}'),
+                  permitido: !dados.doCache && ApiService.instancia.podeExcluirCliente,
+                  aoApagar: () => apagarCliente(context, c),
+                  aoRemover: () => setState(() => _apagados.add(c.idCliente)),
+                  child: ListTile(
+                    leading: CircleAvatar(child: Text(iniciais(c.nome))),
+                    title: Text(c.nome),
+                    subtitle: Text('${c.tipo} ${c.documento}\n${c.email}'),
+                    isThreeLine: true,
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: dados.doCache ? null : () => _abrirFicha(c),
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Iniciais para o avatar, como no app Contatos ("Gabriel Mancini" -> "GM").
+String iniciais(String nome) {
+  final partes = nome.trim().split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+  if (partes.isEmpty) return '?';
+  final primeira = partes.first[0];
+  final ultima = partes.length > 1 ? partes.last[0] : '';
+  return (primeira + ultima).toUpperCase();
+}
+
+/// Ficha do cliente, no estilo do app Contatos: avatar, nome, dados e "Editar" no canto.
+/// Fecha devolvendo true quando o cliente foi alterado ou apagado.
+class ClienteDetalheScreen extends StatefulWidget {
+  final Cliente cliente;
+
+  const ClienteDetalheScreen({super.key, required this.cliente});
+
+  @override
+  State<ClienteDetalheScreen> createState() => _ClienteDetalheScreenState();
+}
+
+class _ClienteDetalheScreenState extends State<ClienteDetalheScreen> {
+  late Cliente _cliente = widget.cliente;
+  bool _alterado = false;
+
+  Future<void> _editar() async {
+    final resultado = await Navigator.of(context).push<ResultadoEdicao>(
+      MaterialPageRoute(builder: (_) => ClienteFormScreen(cliente: _cliente)),
+    );
+    if (resultado == null || !mounted) return;
+
+    if (resultado == ResultadoEdicao.apagado) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    _alterado = true;
+    try {
+      final atualizado = await ApiService.instancia.cliente(_cliente.idCliente);
+      if (mounted) setState(() => _cliente = atualizado);
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.mensagem);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+    final cores = Theme.of(context).colorScheme;
+    final c = _cliente;
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (saiu, _) {
+        if (!saiu) Navigator.of(context).pop(_alterado);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          actions: [
+            TextButton(onPressed: _editar, child: const Text('Editar', style: TextStyle(fontSize: 17))),
+            const SizedBox(width: 8),
+          ],
+        ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          children: [
+            Center(
+              child: CircleAvatar(
+                radius: 56,
+                backgroundColor: cores.primaryContainer,
+                child: Text(iniciais(c.nome),
+                    style: textos.displaySmall?.copyWith(color: cores.onPrimaryContainer, fontWeight: FontWeight.w600)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(c.nome, textAlign: TextAlign.center, style: textos.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+            Text(c.tipo == 'PJ' ? 'Pessoa jurídica' : 'Pessoa física',
+                textAlign: TextAlign.center, style: textos.bodyMedium?.copyWith(color: cores.onSurfaceVariant)),
+            const SizedBox(height: 20),
+            _Campo(rotulo: c.tipo == 'PJ' ? 'CNPJ' : 'CPF', valor: c.documento),
+            _Campo(rotulo: 'e-mail', valor: c.email),
+            if (c.telefone != null && c.telefone!.isNotEmpty) _Campo(rotulo: 'telefone', valor: c.telefone!),
+            if (c.endereco != null && c.endereco!.isNotEmpty) _Campo(rotulo: 'endereço', valor: c.endereco!),
           ],
         ),
       ),
@@ -66,6 +192,33 @@ class _ClientesScreenState extends State<ClientesScreen> {
   }
 }
 
+class _Campo extends StatelessWidget {
+  final String rotulo;
+  final String valor;
+
+  const _Campo({required this.rotulo, required this.valor});
+
+  @override
+  Widget build(BuildContext context) {
+    final textos = Theme.of(context).textTheme;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(rotulo, style: textos.bodySmall),
+            const SizedBox(height: 2),
+            SelectableText(valor, style: textos.bodyLarge),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Edicao (ou cadastro) do cliente. Na edicao, "Apagar Cliente" fica no fim da tela,
+/// como "Apagar Contato" no iPhone.
 class ClienteFormScreen extends StatefulWidget {
   final Cliente? cliente;
 
@@ -110,7 +263,7 @@ class _ClienteFormScreenState extends State<ClienteFormScreen> {
         id: widget.cliente?.idCliente,
       );
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(ResultadoEdicao.salvo);
     } on ApiException catch (e) {
       if (mounted) mostrarMensagem(context, e.mensagem);
     } finally {
@@ -118,12 +271,21 @@ class _ClienteFormScreenState extends State<ClienteFormScreen> {
     }
   }
 
-  String? _obrigatorio(String? valor) => (valor == null || valor.trim().isEmpty) ? 'Campo obrigatorio.' : null;
+  Future<void> _apagar() async {
+    setState(() => _salvando = true);
+    final apagou = await apagarCliente(context, widget.cliente!);
+    if (!mounted) return;
+    setState(() => _salvando = false);
+    if (apagou) Navigator.of(context).pop(ResultadoEdicao.apagado);
+  }
+
+  String? _obrigatorio(String? valor) => (valor == null || valor.trim().isEmpty) ? 'Campo obrigatório.' : null;
 
   @override
   Widget build(BuildContext context) {
+    final editando = widget.cliente != null;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.cliente == null ? 'Novo cliente' : 'Editar cliente')),
+      appBar: AppBar(title: Text(editando ? 'Editar cliente' : 'Novo cliente')),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -133,8 +295,8 @@ class _ClienteFormScreenState extends State<ClienteFormScreen> {
             const SizedBox(height: 12),
             SegmentedButton<String>(
               segments: const [
-                ButtonSegment(value: 'PF', label: Text('Pessoa fisica')),
-                ButtonSegment(value: 'PJ', label: Text('Pessoa juridica')),
+                ButtonSegment(value: 'PF', label: Text('Pessoa física')),
+                ButtonSegment(value: 'PJ', label: Text('Pessoa jurídica')),
               ],
               selected: {_tipo},
               onSelectionChanged: (s) => setState(() => _tipo = s.first),
@@ -151,7 +313,7 @@ class _ClienteFormScreenState extends State<ClienteFormScreen> {
               controller: _email,
               decoration: const InputDecoration(labelText: 'E-mail'),
               keyboardType: TextInputType.emailAddress,
-              validator: (v) => (v == null || !v.contains('@')) ? 'Informe um e-mail valido.' : null,
+              validator: (v) => (v == null || !v.contains('@')) ? 'Informe um e-mail válido.' : null,
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -160,14 +322,17 @@ class _ClienteFormScreenState extends State<ClienteFormScreen> {
               keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 12),
-            TextFormField(controller: _endereco, decoration: const InputDecoration(labelText: 'Endereco (opcional)')),
+            TextFormField(controller: _endereco, decoration: const InputDecoration(labelText: 'Endereço (opcional)')),
             const SizedBox(height: 24),
-            FilledButton.icon(
+            FilledButton(
               onPressed: _salvando ? null : _salvar,
-              icon: const Icon(Icons.save),
-              label: const Text('Salvar'),
               style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              child: Text(editando ? 'Salvar alterações' : 'Cadastrar cliente'),
             ),
+            if (editando && ApiService.instancia.podeExcluirCliente) ...[
+              const SizedBox(height: 32),
+              BotaoApagar(texto: 'Apagar Cliente', aoTocar: _salvando ? null : _apagar),
+            ],
           ],
         ),
       ),
