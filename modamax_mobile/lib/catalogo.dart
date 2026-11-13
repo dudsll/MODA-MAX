@@ -24,6 +24,21 @@ class ModeloProduto {
 
 const limiteEstoqueBaixo = 15;
 
+const _palavrasDeLigacao = {'de', 'da', 'do', 'das', 'dos', 'e', 'com', 'em', 'para', 'a', 'o'};
+
+/// Sigla do produto para o icone sem foto, como as iniciais do app Contatos: as iniciais das
+/// duas primeiras palavras do nome, sem as de ligacao ("Calca Flare de Lantejoulas" -> "CF",
+/// "Bermuda" -> "B").
+String siglaProduto(String nome) {
+  final palavras = nome
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((p) => p.isNotEmpty && !_palavrasDeLigacao.contains(p.toLowerCase()))
+      .toList();
+  if (palavras.isEmpty) return '?';
+  return palavras.take(2).map((p) => p[0]).join().toUpperCase();
+}
+
 String _chave(String nome) => nome.trim().toLowerCase();
 
 /// Junta os tamanhos pelo nome do modelo (sem diferenciar maiusculas), em ordem alfabetica.

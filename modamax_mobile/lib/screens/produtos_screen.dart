@@ -676,14 +676,26 @@ class FotoProduto extends StatelessWidget {
     final endereco = produto.enderecoFoto(apiBaseUrl);
     final cores = Theme.of(context).colorScheme;
     final grande = tamanho > 100;
-    final semFoto = grande
-        ? Container(
-            width: tamanho,
-            height: tamanho,
-            decoration: BoxDecoration(color: cores.surfaceContainerHighest, borderRadius: BorderRadius.circular(tamanho / 8)),
-            child: Icon(Icons.checkroom, size: tamanho / 3, color: cores.onSurfaceVariant),
-          )
-        : CircleAvatar(radius: tamanho / 2, child: Text(produto.tamanho));
+    // Sem foto: a sigla do produto (ex.: "CF" para Calca Flare), no mesmo formato da foto.
+    final semFoto = Container(
+      width: tamanho,
+      height: tamanho,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: cores.primaryContainer,
+        borderRadius: BorderRadius.circular(grande ? tamanho / 8 : tamanho / 4),
+      ),
+      child: Text(
+        siglaProduto(produto.nome),
+        semanticsLabel: produto.nome,
+        style: TextStyle(
+          color: cores.onPrimaryContainer,
+          fontSize: tamanho * 0.36,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.5,
+        ),
+      ),
+    );
     if (endereco == null) return semFoto;
 
     return ClipRRect(

@@ -212,4 +212,12 @@ void main() {
     expect(nivelSemAcento('Tático'), 'tatico');
     expect(nivelSemAcento(null), '');
   });
+
+  test('sigla do produto usa as duas primeiras palavras, sem as de ligacao', () {
+    expect(siglaProduto('Calca Flare de Lantejoulas'), 'CF');
+    expect(siglaProduto('Jaqueta Jeans Premium'), 'JJ');
+    expect(siglaProduto('Calca de Sarja'), 'CS');
+    expect(siglaProduto('Bermuda'), 'B');
+    expect(siglaProduto('  '), '?');
+  });
 }
