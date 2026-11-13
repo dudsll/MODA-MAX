@@ -38,17 +38,12 @@ class _PedidosScreenState extends State<PedidosScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _novoPedido,
-        icon: const Icon(Icons.add_shopping_cart),
-        label: const Text('Novo pedido'),
-      ),
       body: CarregarDados<List<Pedido>>(
         futuro: _futuro,
         aoAtualizar: _atualizar,
         construir: (dados) => ListView(
-          padding: const EdgeInsets.only(bottom: 88),
           children: [
+            BotaoNovo(texto: 'Novo pedido', aoTocar: dados.doCache ? null : _novoPedido),
             if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
             if (dados.valor.isEmpty) const ListTile(title: Text('Nenhum pedido registrado.')),
             for (final p in dados.valor)

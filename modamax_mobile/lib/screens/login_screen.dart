@@ -3,6 +3,15 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'home_screen.dart';
 
+// Mesmos usuarios de demonstracao mostrados no login da Web (criados pelo DbInitializer).
+// Para esconder numa versao de producao: flutter build ... --dart-define=ESCONDER_DEMO=true
+const _esconderDemo = bool.fromEnvironment('ESCONDER_DEMO');
+const _acessosDemo = [
+  ('Diretoria', 'estrategico@modamax.com'),
+  ('Gerência', 'tatico@modamax.com'),
+  ('Vendas', 'operacional@modamax.com'),
+];
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -64,7 +73,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Icon(Icons.checkroom, size: 64, color: tema.colorScheme.primary, semanticLabel: 'Logo ModaMax'),
                       const SizedBox(height: 12),
                       Text('ModaMax', textAlign: TextAlign.center, style: tema.textTheme.headlineMedium),
-                      Text('Gestao comercial na palma da mao',
+                      Text('Gestão comercial na palma da mão',
                           textAlign: TextAlign.center, style: tema.textTheme.bodyMedium),
                       const SizedBox(height: 32),
                       TextFormField(
@@ -73,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         keyboardType: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.email],
                         textInputAction: TextInputAction.next,
-                        validator: (v) => (v == null || !v.contains('@')) ? 'Informe um e-mail valido.' : null,
+                        validator: (v) => (v == null || !v.contains('@')) ? 'Informe um e-mail válido.' : null,
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
@@ -107,6 +116,29 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
                             : const Text('Entrar'),
                       ),
+                      if (!_esconderDemo) ...[
+                        const SizedBox(height: 28),
+                        Text('Acessos de demonstração (senha 123456)',
+                            textAlign: TextAlign.center, style: tema.textTheme.bodySmall),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            for (final (nome, email) in _acessosDemo)
+                              ActionChip(
+                                label: Text(nome),
+                                tooltip: 'Preencher com $email',
+                                onPressed: () => setState(() {
+                                  _email.text = email;
+                                  _senha.text = '123456';
+                                  _erro = null;
+                                }),
+                              ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),

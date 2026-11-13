@@ -32,7 +32,7 @@ class GraficoBarras extends StatelessWidget {
             Text(titulo, style: tema.textTheme.titleMedium),
             const SizedBox(height: 16),
             if (pontos.isEmpty || maximo == 0)
-              const Text('Sem dados no periodo.')
+              const Text('Sem dados no período.')
             else if (horizontal)
               ...pontos.map((p) => _barraHorizontal(context, p, maximo))
             else

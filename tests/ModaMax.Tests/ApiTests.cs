@@ -302,6 +302,79 @@ public class ApiTests : IClassFixture<ModaMaxFactory>
     }
 
     [Fact]
+    public async Task Cadastro_completo_de_produto_pela_api_como_no_app()
+    {
+        var cliente = await ClienteLogadoAsync("estrategico@modamax.com");
+
+        var categorias = await cliente.GetFromJsonAsync<JsonElement[]>("/api/categorias", Json);
+        var fornecedores = await cliente.GetFromJsonAsync<JsonElement[]>("/api/fornecedores", Json);
+        Assert.NotEmpty(fornecedores!);
+        var produto = new
+        {
+            nome = "Camisa Jeans Teste",
+            descricao = "Criada pelo app",
+            tamanho = "M",
+            cor = "Azul",
+            preco = 129.90m,
+            estoque = 12,
+            idCategoria = categorias![0].GetProperty("idCategoria").GetInt32(),
+            idFornecedor = fornecedores![0].GetProperty("idFornecedor").GetInt32(),
+            codigoBarras = (string?)null
+        };
+
+        var criado = await cliente.PostAsJsonAsync("/api/produtos", produto);
+        Assert.Equal(HttpStatusCode.Created, criado.StatusCode);
+        var id = (await criado.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("idProduto").GetInt32();
+
+        var alterado = await cliente.PutAsJsonAsync($"/api/produtos/{id}", produto with { preco = 99.90m, cor = "Preto" });
+        Assert.Equal(HttpStatusCode.NoContent, alterado.StatusCode);
+        var lido = await cliente.GetFromJsonAsync<JsonElement>($"/api/produtos/{id}", Json);
+        Assert.Equal("Preto", lido.GetProperty("cor").GetString());
+        Assert.Equal(99.90m, lido.GetProperty("preco").GetDecimal());
+
+        Assert.Equal(HttpStatusCode.NoContent, (await cliente.DeleteAsync($"/api/produtos/{id}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await cliente.GetAsync($"/api/produtos/{id}")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Excluir_cliente_pela_api_como_no_app()
+    {
+        var gerencia = await ClienteLogadoAsync("tatico@modamax.com");
+        var criado = await gerencia.PostAsJsonAsync("/api/clientes", new
+        {
+            nome = "Cliente Para Excluir", tipo = "PF", documento = "12345678909", email = "excluir@teste.com"
+        });
+        Assert.Equal(HttpStatusCode.Created, criado.StatusCode);
+        var id = (await criado.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("idCliente").GetInt32();
+
+        // Vendedor nao exclui clientes.
+        var vendedor = await ClienteLogadoAsync("operacional@modamax.com");
+        Assert.Equal(HttpStatusCode.Forbidden, (await vendedor.DeleteAsync($"/api/clientes/{id}")).StatusCode);
+
+        // Cliente com pedido fica protegido, para nao apagar o historico de vendas.
+        var produtos = await gerencia.GetFromJsonAsync<JsonElement[]>("/api/produtos", Json);
+        var pedido = await gerencia.PostAsJsonAsync("/api/pedidos", new
+        {
+            idCliente = id,
+            tiposVenda = "Varejo",
+            itens = new[] { new { idProduto = produtos![0].GetProperty("idProduto").GetInt32(), quantidade = 1, desconto = 0 } }
+        });
+        Assert.Equal(HttpStatusCode.Created, pedido.StatusCode);
+        var recusado = await gerencia.DeleteAsync($"/api/clientes/{id}");
+        Assert.Equal(HttpStatusCode.Conflict, recusado.StatusCode);
+        Assert.Contains("pedidos", (await recusado.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("detail").GetString());
+
+        // Sem pedidos, a exclusao funciona.
+        var outro = await gerencia.PostAsJsonAsync("/api/clientes", new
+        {
+            nome = "Cliente Sem Pedidos", tipo = "PF", documento = "98765432100", email = "sempedidos@teste.com"
+        });
+        var idOutro = (await outro.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("idCliente").GetInt32();
+        Assert.Equal(HttpStatusCode.NoContent, (await gerencia.DeleteAsync($"/api/clientes/{idOutro}")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await gerencia.GetAsync($"/api/clientes/{idOutro}")).StatusCode);
+    }
+
+    [Fact]
     public async Task Entrada_de_estoque_pela_api_funciona_no_modo_sqlite()
     {
         var cliente = await ClienteLogadoAsync("tatico@modamax.com");
