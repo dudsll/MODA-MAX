@@ -63,43 +63,48 @@ class _ClientesScreenState extends State<ClientesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: CarregarDados<List<Cliente>>(
-        futuro: _futuro,
-        aoAtualizar: _atualizar,
-        construir: (dados) {
-          final clientes = dados.valor.where((c) => !_apagados.contains(c.idCliente)).toList();
-          return ListView(
-            children: [
-              CampoBusca(
-                dica: 'Buscar por nome ou documento',
-                aoBuscar: (texto) {
-                  _busca = texto;
-                  _atualizar();
-                },
-              ),
-              BotaoNovo(texto: 'Novo cliente', aoTocar: dados.doCache ? null : _novoCliente),
-              if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
-              if (clientes.isEmpty) const ListTile(title: Text('Nenhum cliente encontrado.')),
-              for (final c in clientes)
-                ArrastarParaApagar(
-                  chave: ValueKey('cliente-${c.idCliente}'),
-                  permitido: !dados.doCache && ApiService.instancia.podeExcluirCliente,
-                  aoApagar: () => apagarCliente(context, c),
-                  aoRemover: () => setState(() => _apagados.add(c.idCliente)),
-                  child: ListTile(
-                    leading: CircleAvatar(child: Text(iniciais(c.nome))),
-                    title: Text(c.nome),
-                    subtitle: Text('${c.tipo} ${c.documento}\n${c.email}'),
-                    isThreeLine: true,
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: dados.doCache ? null : () => _abrirFicha(c),
+    return CarregarDados<List<Cliente>>(
+      futuro: _futuro,
+      aoAtualizar: _atualizar,
+      construir: (dados) {
+        final clientes = dados.valor.where((c) => !_apagados.contains(c.idCliente)).toList();
+        return ListaAtualizavel(
+          aoAtualizar: _atualizar,
+          children: [
+            CampoBusca(
+              dica: 'Buscar por nome ou documento',
+              texto: _busca,
+              aoBuscar: (texto) {
+                _busca = texto;
+                _atualizar();
+              },
+            ),
+            BotaoNovo(texto: 'Novo cliente', aoTocar: dados.doCache ? null : _novoCliente),
+            if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
+            if (clientes.isEmpty)
+              const SecaoLista(children: [ItemLista(titulo: 'Nenhum cliente encontrado.')]),
+            SecaoLista(
+              rodape: clientes.isEmpty ? null : '${clientes.length} ${clientes.length == 1 ? 'cliente' : 'clientes'}',
+              children: [
+                for (final c in clientes)
+                  ArrastarParaApagar(
+                    chave: ValueKey('cliente-${c.idCliente}'),
+                    permitido: !dados.doCache && ApiService.instancia.podeExcluirCliente,
+                    aoApagar: () => apagarCliente(context, c),
+                    aoRemover: () => setState(() => _apagados.add(c.idCliente)),
+                    child: ItemLista(
+                      inicio: Avatar(iniciais(c.nome)),
+                      titulo: c.nome,
+                      subtitulo: '${c.tipo} ${c.documento} · ${c.email}',
+                      seta: true,
+                      aoTocar: dados.doCache ? null : () => _abrirFicha(c),
+                    ),
                   ),
-                ),
-            ],
-          );
-        },
-      ),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -149,8 +154,6 @@ class _ClienteDetalheScreenState extends State<ClienteDetalheScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textos = Theme.of(context).textTheme;
-    final cores = Theme.of(context).colorScheme;
     final c = _cliente;
 
     return PopScope(
@@ -158,33 +161,24 @@ class _ClienteDetalheScreenState extends State<ClienteDetalheScreen> {
       onPopInvokedWithResult: (saiu, _) {
         if (!saiu) Navigator.of(context).pop(_alterado);
       },
-      child: Scaffold(
-        appBar: AppBar(
-          actions: [
-            TextButton(onPressed: _editar, child: const Text('Editar', style: TextStyle(fontSize: 17))),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      child: Pagina(
+        acoes: [BotaoTopo(rotulo: 'Editar', aoTocar: _editar)],
+        corpo: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
           children: [
-            Center(
-              child: CircleAvatar(
-                radius: 56,
-                backgroundColor: cores.primaryContainer,
-                child: Text(iniciais(c.nome),
-                    style: textos.displaySmall?.copyWith(color: cores.onPrimaryContainer, fontWeight: FontWeight.w600)),
-              ),
-            ),
+            const SizedBox(height: 8),
+            Center(child: Avatar(iniciais(c.nome), tamanho: 112)),
             const SizedBox(height: 12),
-            Text(c.nome, textAlign: TextAlign.center, style: textos.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+            Text(c.nome, textAlign: TextAlign.center, style: estiloTituloGrande(context)),
             Text(c.tipo == 'PJ' ? 'Pessoa jurídica' : 'Pessoa física',
-                textAlign: TextAlign.center, style: textos.bodyMedium?.copyWith(color: cores.onSurfaceVariant)),
-            const SizedBox(height: 20),
-            _Campo(rotulo: c.tipo == 'PJ' ? 'CNPJ' : 'CPF', valor: c.documento),
-            _Campo(rotulo: 'e-mail', valor: c.email),
-            if (c.telefone != null && c.telefone!.isNotEmpty) _Campo(rotulo: 'telefone', valor: c.telefone!),
-            if (c.endereco != null && c.endereco!.isNotEmpty) _Campo(rotulo: 'endereço', valor: c.endereco!),
+                textAlign: TextAlign.center, style: estiloSecundario(context)),
+            const SizedBox(height: 12),
+            SecaoLista(children: [
+              _Campo(rotulo: c.tipo == 'PJ' ? 'CNPJ' : 'CPF', valor: c.documento),
+              _Campo(rotulo: 'e-mail', valor: c.email),
+              if (c.telefone != null && c.telefone!.isNotEmpty) _Campo(rotulo: 'telefone', valor: c.telefone!),
+              if (c.endereco != null && c.endereco!.isNotEmpty) _Campo(rotulo: 'endereço', valor: c.endereco!),
+            ]),
           ],
         ),
       ),
@@ -192,6 +186,7 @@ class _ClienteDetalheScreenState extends State<ClienteDetalheScreen> {
   }
 }
 
+/// Um dado do cliente: o rotulo pequeno em cima e o valor embaixo, como no app Contatos.
 class _Campo extends StatelessWidget {
   final String rotulo;
   final String valor;
@@ -200,18 +195,15 @@ class _Campo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textos = Theme.of(context).textTheme;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(rotulo, style: textos.bodySmall),
-            const SizedBox(height: 2),
-            SelectableText(valor, style: textos.bodyLarge),
-          ],
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(rotulo, style: estiloLegenda(context)),
+          const SizedBox(height: 2),
+          SelectableText(valor, style: estiloCorpo(context)),
+        ],
       ),
     );
   }
@@ -279,59 +271,63 @@ class _ClienteFormScreenState extends State<ClienteFormScreen> {
     if (apagou) Navigator.of(context).pop(ResultadoEdicao.apagado);
   }
 
-  String? _obrigatorio(String? valor) => (valor == null || valor.trim().isEmpty) ? 'Campo obrigatório.' : null;
+  String? _obrigatorio(String valor) => valor.trim().isEmpty ? 'Campo obrigatório.' : null;
 
   @override
   Widget build(BuildContext context) {
     final editando = widget.cliente != null;
-    return Scaffold(
-      appBar: AppBar(title: Text(editando ? 'Editar cliente' : 'Novo cliente')),
-      body: Form(
+    final ios = ehIOS(context);
+    return Pagina(
+      titulo: editando ? 'Editar cliente' : 'Novo cliente',
+      // No iPhone o "Salvar" fica no canto superior, como ao editar um contato.
+      acoes: ios ? [BotaoTopo(rotulo: 'Salvar', aoTocar: _salvando ? null : _salvar)] : const [],
+      corpo: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.only(bottom: 32),
           children: [
-            TextFormField(controller: _nome, decoration: const InputDecoration(labelText: 'Nome'), validator: _obrigatorio),
-            const SizedBox(height: 12),
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'PF', label: Text('Pessoa física')),
-                ButtonSegment(value: 'PJ', label: Text('Pessoa jurídica')),
-              ],
-              selected: {_tipo},
-              onSelectionChanged: (s) => setState(() => _tipo = s.first),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: Segmentado<String>(
+                opcoes: const {'PF': 'Pessoa física', 'PJ': 'Pessoa jurídica'},
+                selecionado: _tipo,
+                aoMudar: (t) => setState(() => _tipo = t),
+              ),
             ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _documento,
-              decoration: InputDecoration(labelText: _tipo == 'PF' ? 'CPF' : 'CNPJ'),
-              keyboardType: TextInputType.number,
-              validator: _obrigatorio,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _email,
-              decoration: const InputDecoration(labelText: 'E-mail'),
-              keyboardType: TextInputType.emailAddress,
-              validator: (v) => (v == null || !v.contains('@')) ? 'Informe um e-mail válido.' : null,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _telefone,
-              decoration: const InputDecoration(labelText: 'Telefone (opcional)'),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 12),
-            TextFormField(controller: _endereco, decoration: const InputDecoration(labelText: 'Endereço (opcional)')),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _salvando ? null : _salvar,
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-              child: Text(editando ? 'Salvar alterações' : 'Cadastrar cliente'),
-            ),
+            SecaoFormulario(children: [
+              CampoTexto(controle: _nome, rotulo: 'Nome', maiusculas: TextCapitalization.words, validar: _obrigatorio),
+              CampoTexto(
+                controle: _documento,
+                rotulo: _tipo == 'PF' ? 'CPF' : 'CNPJ',
+                teclado: TextInputType.number,
+                validar: _obrigatorio,
+              ),
+            ]),
+            SecaoFormulario(cabecalho: 'Contato', children: [
+              CampoTexto(
+                controle: _email,
+                rotulo: 'E-mail',
+                teclado: TextInputType.emailAddress,
+                validar: (v) => v.contains('@') ? null : 'Informe um e-mail válido.',
+              ),
+              CampoTexto(controle: _telefone, rotulo: 'Telefone', dica: 'Opcional', teclado: TextInputType.phone),
+              CampoTexto(controle: _endereco, rotulo: 'Endereço', dica: 'Opcional', maiusculas: TextCapitalization.words),
+            ]),
+            if (!ios)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: Botao.principal(
+                  editando ? 'Salvar alterações' : 'Cadastrar cliente',
+                  carregando: _salvando,
+                  aoTocar: _salvar,
+                ),
+              ),
             if (editando && ApiService.instancia.podeExcluirCliente) ...[
-              const SizedBox(height: 32),
-              BotaoApagar(texto: 'Apagar Cliente', aoTocar: _salvando ? null : _apagar),
+              const SizedBox(height: 24),
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: ios ? 0 : 16),
+                child: BotaoApagar(texto: 'Apagar Cliente', aoTocar: _salvando ? null : _apagar),
+              ),
             ],
           ],
         ),

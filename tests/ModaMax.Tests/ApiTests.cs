@@ -297,7 +297,8 @@ public class ApiTests : IClassFixture<ModaMaxFactory>
         Assert.True(meta.TryGetProperty("projecaoFaturamento", out _));
 
         var reposicao = await cliente.GetFromJsonAsync<JsonElement[]>("/api/reposicao", Json);
-        Assert.Equal(10, reposicao!.Length);
+        var produtos = await cliente.GetFromJsonAsync<JsonElement[]>("/api/produtos", Json);
+        Assert.Equal(produtos!.Length, reposicao!.Length);
         Assert.Contains(reposicao, r => r.GetProperty("situacao").GetString() == "Critico");
     }
 

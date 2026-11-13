@@ -35,7 +35,7 @@ class _Inicio extends StatelessWidget {
       future: ApiService.instancia.restaurarSessao(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(body: Center(child: CircularProgressIndicator.adaptive()));
         }
         return snapshot.data! ? const HomeScreen() : const LoginScreen();
       },

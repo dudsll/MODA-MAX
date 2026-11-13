@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -36,23 +37,22 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
   double get _total => _itens.fold(0, (soma, i) => soma + _precoUnitario(i.produto) * i.quantidade);
 
   Future<void> _adicionarProduto(List<Produto> produtos) async {
-    final produto = await showModalBottomSheet<Produto>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            const ListTile(title: Text('Escolha o produto')),
+    final produto = await abrirFolha<Produto>(
+      context,
+      construir: (folha, rolagem) => Folha(
+        titulo: 'Escolha o produto',
+        rolagem: rolagem,
+        children: [
+          SecaoLista(children: [
             for (final p in produtos)
-              ListTile(
-                title: Text(p.nome),
-                subtitle: Text('Tam. ${p.tamanho} - ${p.estoque} em estoque'),
-                trailing: Text(formatarMoeda(p.preco)),
-                onTap: () => Navigator.pop(context, p),
+              ItemLista(
+                titulo: p.nome,
+                subtitulo: 'Tam. ${p.tamanho} · ${p.cor} · ${p.estoque} em estoque',
+                valor: formatarMoeda(p.preco),
+                aoTocar: () => Navigator.of(folha).pop(p),
               ),
-          ],
-        ),
+          ]),
+        ],
       ),
     );
     if (produto == null) return;
@@ -115,119 +115,123 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Novo pedido')),
-      body: FutureBuilder<(List<Cliente>, List<Produto>)>(
+    return Pagina(
+      titulo: 'Novo pedido',
+      corpo: FutureBuilder<(List<Cliente>, List<Produto>)>(
         future: _dados,
         builder: (context, snapshot) {
           if (snapshot.hasError) return Center(child: Text('${snapshot.error}'));
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator.adaptive());
 
           final (clientes, produtos) = snapshot.data!;
+          final ios = ehIOS(context);
 
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.only(bottom: 32),
             children: [
-              DropdownButtonFormField<Cliente>(
-                value: _cliente,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Cliente', border: OutlineInputBorder()),
-                items: [
-                  for (final c in clientes) DropdownMenuItem(value: c, child: Text(c.nome)),
-                ],
-                onChanged: (c) => setState(() => _cliente = c),
-              ),
-              const SizedBox(height: 16),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'Varejo', label: Text('Varejo')),
-                  ButtonSegment(value: 'Atacado', label: Text('Atacado (-10%)')),
-                ],
-                selected: {_tipoVenda},
-                onSelectionChanged: (s) => setState(() => _tipoVenda = s.first),
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: _formaPagamento,
-                decoration: const InputDecoration(labelText: 'Forma de pagamento'),
-                items: [
-                  for (final forma in formasPagamento.entries) DropdownMenuItem(value: forma.key, child: Text(forma.value)),
-                ],
-                onChanged: (f) => setState(() {
-                  _formaPagamento = f ?? 'Pix';
-                  if (_formaPagamento != 'Credito') _parcelas = 1;
-                }),
-              ),
-              // Parcelamento so no cartao de credito, de 1 a 6 vezes (mesma regra da API).
-              if (_formaPagamento == 'Credito') ...[
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  value: _parcelas,
-                  decoration: const InputDecoration(labelText: 'Parcelas'),
-                  items: [
-                    for (var n = 1; n <= maxParcelas; n++)
-                      DropdownMenuItem(value: n, child: Text(n == 1 ? 'À vista' : '${n}x de ${formatarMoeda(_total / n)}')),
-                  ],
-                  onChanged: (n) => setState(() => _parcelas = n ?? 1),
+              SecaoFormulario(children: [
+                Seletor<int>(
+                  rotulo: 'Cliente',
+                  valor: _cliente?.idCliente,
+                  opcoes: {for (final c in clientes) c.idCliente: c.nome},
+                  aoMudar: (id) => setState(() => _cliente = clientes.firstWhere((c) => c.idCliente == id)),
                 ),
-              ],
-              const SizedBox(height: 16),
-              Row(
+              ]),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+                child: Segmentado<String>(
+                  opcoes: const {'Varejo': 'Varejo', 'Atacado': 'Atacado (-10%)'},
+                  selecionado: _tipoVenda,
+                  aoMudar: (t) => setState(() => _tipoVenda = t),
+                ),
+              ),
+              SecaoFormulario(cabecalho: 'Pagamento', children: [
+                Seletor<String>(
+                  rotulo: 'Forma de pagamento',
+                  valor: _formaPagamento,
+                  opcoes: formasPagamento,
+                  aoMudar: (f) => setState(() {
+                    _formaPagamento = f;
+                    if (_formaPagamento != 'Credito') _parcelas = 1;
+                  }),
+                ),
+                // Parcelamento so no cartao de credito, de 1 a 6 vezes (mesma regra da API).
+                if (_formaPagamento == 'Credito')
+                  Seletor<int>(
+                    rotulo: 'Parcelas',
+                    valor: _parcelas,
+                    opcoes: {
+                      for (var n = 1; n <= maxParcelas; n++) n: n == 1 ? 'À vista' : '${n}x de ${formatarMoeda(_total / n)}',
+                    },
+                    aoMudar: (n) => setState(() => _parcelas = n),
+                  ),
+              ]),
+              SecaoLista(
+                cabecalho: 'Itens',
                 children: [
-                  Expanded(child: Text('Itens', style: Theme.of(context).textTheme.titleMedium)),
-                  IconButton(
-                    tooltip: 'Adicionar pelo código de barras',
-                    onPressed: () => _lerCodigo(produtos),
-                    icon: const Icon(Icons.qr_code_scanner),
-                  ),
-                  TextButton.icon(
-                    onPressed: () => _adicionarProduto(produtos),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Adicionar produto'),
-                  ),
+                  if (_itens.isEmpty) const ItemLista(titulo: 'Nenhum produto adicionado.'),
+                  for (final item in _itens)
+                    ItemLista(
+                      titulo: item.produto.nome,
+                      subtitulo: 'Tam. ${item.produto.tamanho} · ${formatarMoeda(_precoUnitario(item.produto))} cada',
+                      fim: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          BotaoIcone(
+                            dica: 'Diminuir quantidade de ${item.produto.nome}',
+                            iconeMaterial: Icons.remove_circle_outline,
+                            iconeIOS: CupertinoIcons.minus_circle,
+                            aoTocar: () => setState(() {
+                              if (item.quantidade > 1) {
+                                item.quantidade--;
+                              } else {
+                                _itens.remove(item);
+                              }
+                            }),
+                          ),
+                          Text('${item.quantidade}', semanticsLabel: 'Quantidade ${item.quantidade}'),
+                          BotaoIcone(
+                            dica: 'Aumentar quantidade de ${item.produto.nome}',
+                            iconeMaterial: Icons.add_circle_outline,
+                            iconeIOS: CupertinoIcons.plus_circle,
+                            aoTocar: item.quantidade >= item.produto.estoque
+                                ? null
+                                : () => setState(() => item.quantidade++),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ItemLista(titulo: 'Total estimado', valor: formatarMoeda(_total)),
                 ],
               ),
-              if (_itens.isEmpty) const ListTile(title: Text('Nenhum produto adicionado.')),
-              for (final item in _itens)
-                ListTile(
-                  title: Text(item.produto.nome),
-                  subtitle: Text('${formatarMoeda(_precoUnitario(item.produto))} cada'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'Diminuir quantidade de ${item.produto.nome}',
-                        icon: const Icon(Icons.remove_circle_outline),
-                        onPressed: () => setState(() {
-                          if (item.quantidade > 1) {
-                            item.quantidade--;
-                          } else {
-                            _itens.remove(item);
-                          }
-                        }),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Botao.secundario(
+                        'Adicionar',
+                        iconeMaterial: Icons.add,
+                        iconeIOS: CupertinoIcons.add,
+                        aoTocar: () => _adicionarProduto(produtos),
                       ),
-                      Text('${item.quantidade}', semanticsLabel: 'Quantidade ${item.quantidade}'),
-                      IconButton(
-                        tooltip: 'Aumentar quantidade de ${item.produto.nome}',
-                        icon: const Icon(Icons.add_circle_outline),
-                        onPressed: item.quantidade >= item.produto.estoque
-                            ? null
-                            : () => setState(() => item.quantidade++),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Botao.secundario(
+                        'Ler código',
+                        iconeMaterial: Icons.qr_code_scanner,
+                        iconeIOS: CupertinoIcons.barcode_viewfinder,
+                        aoTocar: () => _lerCodigo(produtos),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              const Divider(),
-              ListTile(
-                title: const Text('Total estimado'),
-                trailing: Text(formatarMoeda(_total), style: Theme.of(context).textTheme.titleLarge),
               ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: _enviando ? null : _enviar,
-                icon: const Icon(Icons.send),
-                label: const Text('Registrar pedido'),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
+              SizedBox(height: ios ? 20 : 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Botao.principal('Registrar pedido', carregando: _enviando, aoTocar: _enviar),
               ),
             ],
           );

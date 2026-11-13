@@ -120,6 +120,8 @@ public static class DbInitializer
             produtos[i].CodigoBarras = CodigoBarras.Gerar($"789123450{i + 1:000}");
         }
 
+        AdicionarGradeDeTamanhos(produtos, categorias[8], fornecedores);
+
         var produtoDoPedido = new[] { 4, 5, 9, 8, 7 };
         for (var i = 0; i < pedidos.Count; i++)
         {
@@ -150,6 +152,73 @@ public static class DbInitializer
         context.LogsSistema.AddRange(logs);
         GerarVendasDemonstracao(context, clientes, produtos);
         context.SaveChanges();
+    }
+
+    // Na loja cada modelo e vendido em varios tamanhos, e cada tamanho e um produto proprio
+    // (com codigo de barras e estoque proprios). Os 10 produtos acima continuam com os mesmos
+    // codigos; aqui entram os outros tamanhos de cada modelo (alguns com estoque baixo ou
+    // esgotados) e dois modelos de calca com a grade completa.
+    private static void AdicionarGradeDeTamanhos(List<Produto> produtos, Categoria calca, List<Fornecedor> fornecedores)
+    {
+        var outrosTamanhos = new (int Modelo, string Tamanho, int Estoque)[]
+        {
+            (0, "34", 40), (0, "38", 60), (0, "40", 25),
+            (1, "36", 30), (1, "40", 22), (1, "42", 0),
+            (2, "M", 45), (2, "G", 38), (2, "GG", 12),
+            (3, "38", 80), (3, "42", 70), (3, "44", 40), (3, "46", 20),
+            (4, "36", 60), (4, "40", 55), (4, "42", 30),
+            (5, "P", 20), (5, "M", 35), (5, "GG", 10),
+            (6, "38", 28), (6, "40", 18), (6, "42", 9),
+            (7, "P", 70), (7, "G", 60), (7, "GG", 25),
+            (8, "36", 50), (8, "38", 90), (8, "40", 85), (8, "42", 60), (8, "44", 40),
+            (9, "P", 12), (9, "M", 20), (9, "G", 16)
+        };
+
+        var novos = new List<Produto>();
+        foreach (var (modelo, tamanho, estoque) in outrosTamanhos)
+        {
+            var original = produtos[modelo];
+            novos.Add(new Produto
+            {
+                Nome = original.Nome,
+                Descricao = original.Descricao,
+                Tamanho = tamanho,
+                Cor = original.Cor,
+                Preco = original.Preco,
+                Estoque = estoque,
+                Categoria = original.Categoria,
+                Fornecedor = original.Fornecedor
+            });
+        }
+
+        void Modelo(string nome, string descricao, string cor, decimal preco, Fornecedor fornecedor, params (string Tamanho, int Estoque)[] grade)
+        {
+            foreach (var (tamanho, estoque) in grade)
+            {
+                novos.Add(new Produto
+                {
+                    Nome = nome,
+                    Descricao = descricao,
+                    Tamanho = tamanho,
+                    Cor = cor,
+                    Preco = preco,
+                    Estoque = estoque,
+                    Categoria = calca,
+                    Fornecedor = fornecedor
+                });
+            }
+        }
+
+        Modelo("Calca Flare de Lantejoulas", "Calca flare com lantejoulas bordadas, para festas.", "Azul escuro", 249.90m,
+            fornecedores[1], ("36", 8), ("38", 14), ("40", 0), ("42", 6));
+        Modelo("Calca Skinny", "Calca skinny com elastano, cintura alta.", "Preto", 159.90m,
+            fornecedores[2], ("36", 45), ("38", 60), ("40", 52), ("42", 35), ("44", 18));
+
+        foreach (var produto in novos)
+        {
+            produtos.Add(produto);
+            produto.CodigoBarras = CodigoBarras.Gerar($"789123450{produtos.Count:000}");
+        }
     }
 
     // Vendas espalhadas pelos ultimos 5 meses (com mais movimento no ultimo mes) para o painel,
