@@ -1,6 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../services/api_service.dart';
+import '../widgets/adaptativo.dart';
 import 'home_screen.dart';
 
 // Mesmos usuarios de demonstracao mostrados no login da Web (criados pelo DbInitializer).
@@ -55,92 +57,96 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tema = Theme.of(context);
+    final ios = ehIOS(context);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Form(
-                key: _formKey,
-                child: AutofillGroup(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Icon(Icons.checkroom, size: 64, color: tema.colorScheme.primary, semanticLabel: 'Logo ModaMax'),
-                      const SizedBox(height: 12),
-                      Text('ModaMax', textAlign: TextAlign.center, style: tema.textTheme.headlineMedium),
-                      Text('Gestão comercial na palma da mão',
-                          textAlign: TextAlign.center, style: tema.textTheme.bodyMedium),
-                      const SizedBox(height: 32),
-                      TextFormField(
-                        controller: _email,
-                        decoration: const InputDecoration(labelText: 'E-mail', prefixIcon: Icon(Icons.email_outlined)),
-                        keyboardType: TextInputType.emailAddress,
-                        autofillHints: const [AutofillHints.email],
-                        textInputAction: TextInputAction.next,
-                        validator: (v) => (v == null || !v.contains('@')) ? 'Informe um e-mail válido.' : null,
+    final conteudo = SafeArea(
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(vertical: 24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Form(
+              key: _formKey,
+              child: AutofillGroup(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Icon(
+                      icone(context, material: Icons.checkroom, ios: CupertinoIcons.tag_fill),
+                      size: 64,
+                      color: corDestaque(context),
+                      semanticLabel: 'Logo ModaMax',
+                    ),
+                    const SizedBox(height: 12),
+                    Text('ModaMax', textAlign: TextAlign.center, style: estiloTituloGrande(context).copyWith(fontSize: 32)),
+                    Text('Gestão comercial na palma da mão', textAlign: TextAlign.center, style: estiloSecundario(context)),
+                    const SizedBox(height: 24),
+                    SecaoFormulario(children: [
+                      CampoTexto(
+                        controle: _email,
+                        rotulo: 'E-mail',
+                        dica: 'nome@modamax.com',
+                        teclado: TextInputType.emailAddress,
+                        acaoTeclado: TextInputAction.next,
+                        preenchimento: const [AutofillHints.email],
+                        validar: (v) => v.contains('@') ? null : 'Informe um e-mail válido.',
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _senha,
-                        obscureText: !_mostrarSenha,
-                        autofillHints: const [AutofillHints.password],
-                        decoration: InputDecoration(
-                          labelText: 'Senha',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          suffixIcon: IconButton(
-                            tooltip: _mostrarSenha ? 'Ocultar senha' : 'Mostrar senha',
-                            icon: Icon(_mostrarSenha ? Icons.visibility_off : Icons.visibility),
-                            onPressed: () => setState(() => _mostrarSenha = !_mostrarSenha),
-                          ),
-                        ),
-                        onFieldSubmitted: (_) => _entrar(),
-                        validator: (v) => (v == null || v.isEmpty) ? 'Informe a senha.' : null,
-                      ),
-                      if (_erro != null) ...[
-                        const SizedBox(height: 16),
-                        Semantics(
-                          liveRegion: true,
-                          child: Text(_erro!, style: TextStyle(color: tema.colorScheme.error)),
-                        ),
-                      ],
-                      const SizedBox(height: 24),
-                      FilledButton(
-                        onPressed: _carregando ? null : _entrar,
-                        style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                        child: _carregando
-                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Text('Entrar'),
-                      ),
-                      if (!_esconderDemo) ...[
-                        const SizedBox(height: 28),
-                        Text('Acessos de demonstração (senha 123456)',
-                            textAlign: TextAlign.center, style: tema.textTheme.bodySmall),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          alignment: WrapAlignment.center,
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            for (final (nome, email) in _acessosDemo)
-                              ActionChip(
-                                label: Text(nome),
-                                tooltip: 'Preencher com $email',
-                                onPressed: () => setState(() {
-                                  _email.text = email;
-                                  _senha.text = '123456';
-                                  _erro = null;
-                                }),
+                      CampoTexto(
+                        controle: _senha,
+                        rotulo: 'Senha',
+                        oculto: !_mostrarSenha,
+                        preenchimento: const [AutofillHints.password],
+                        aoConfirmar: (_) => _entrar(),
+                        validar: (v) => v.isEmpty ? 'Informe a senha.' : null,
+                        sufixo: ios
+                            ? CupertinoButton(
+                                padding: const EdgeInsets.only(right: 4),
+                                minimumSize: const Size(32, 32),
+                                onPressed: () => setState(() => _mostrarSenha = !_mostrarSenha),
+                                child: Icon(_mostrarSenha ? CupertinoIcons.eye_slash : CupertinoIcons.eye, size: 20),
+                              )
+                            : IconButton(
+                                tooltip: _mostrarSenha ? 'Ocultar senha' : 'Mostrar senha',
+                                icon: Icon(_mostrarSenha ? Icons.visibility_off : Icons.visibility),
+                                onPressed: () => setState(() => _mostrarSenha = !_mostrarSenha),
                               ),
-                          ],
+                      ),
+                    ]),
+                    if (_erro != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 4, 24, 0),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(_erro!, textAlign: TextAlign.center, style: TextStyle(color: corVermelha(context))),
                         ),
-                      ],
+                      ),
+                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Botao.principal('Entrar', carregando: _carregando, aoTocar: _entrar),
+                    ),
+                    if (!_esconderDemo) ...[
+                      const SizedBox(height: 28),
+                      Text('Acessos de demonstração (senha 123456)',
+                          textAlign: TextAlign.center, style: estiloLegenda(context)),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final (nome, email) in _acessosDemo)
+                            ios
+                                ? CupertinoButton.tinted(
+                                    sizeStyle: CupertinoButtonSize.small,
+                                    onPressed: () => _preencher(email),
+                                    child: Text(nome),
+                                  )
+                                : ActionChip(label: Text(nome), tooltip: 'Preencher com $email', onPressed: () => _preencher(email)),
+                        ],
+                      ),
                     ],
-                  ),
+                  ],
                 ),
               ),
             ),
@@ -148,5 +154,19 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+
+    if (ios) {
+      return CupertinoPageScaffold(
+        backgroundColor: fundoAgrupado(context),
+        child: Material(type: MaterialType.transparency, child: conteudo),
+      );
+    }
+    return Scaffold(body: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: conteudo));
   }
+
+  void _preencher(String email) => setState(() {
+        _email.text = email;
+        _senha.text = '123456';
+        _erro = null;
+      });
 }

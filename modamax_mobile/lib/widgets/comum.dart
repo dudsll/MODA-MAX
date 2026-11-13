@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import '../models.dart';
 import '../screens/login_screen.dart';
 import '../services/api_service.dart';
+import 'adaptativo.dart';
+
+export 'adaptativo.dart';
 
 /// Mostra carregamento, erro (com botao de tentar de novo) ou o conteudo,
 /// e permite puxar a lista para baixo para sincronizar com a API.
@@ -20,7 +23,7 @@ class CarregarDados<T> extends StatelessWidget {
       future: futuro,
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator.adaptive());
         }
 
         if (snapshot.hasError) {
@@ -42,18 +45,19 @@ class CarregarDados<T> extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.cloud_off, size: 48),
+                  Icon(icone(context, material: Icons.cloud_off, ios: CupertinoIcons.wifi_slash), size: 48),
                   const SizedBox(height: 12),
                   Text('$erro', textAlign: TextAlign.center),
                   const SizedBox(height: 12),
-                  OutlinedButton(onPressed: aoAtualizar, child: const Text('Tentar novamente')),
+                  Botao.secundario('Tentar novamente', aoTocar: aoAtualizar),
                 ],
               ),
             ),
           );
         }
 
-        return RefreshIndicator(onRefresh: aoAtualizar, child: construir(snapshot.data as Dados<T>));
+        // Quem usa monta a lista com ListaAtualizavel (puxar para atualizar de cada sistema).
+        return construir(snapshot.data as Dados<T>);
       },
     );
   }
@@ -71,14 +75,13 @@ class AvisoOffline extends StatelessWidget {
         : ' Última sincronização: ${formatarData(sincronizadoEm!)} '
             '${sincronizadoEm!.hour.toString().padLeft(2, '0')}:${sincronizadoEm!.minute.toString().padLeft(2, '0')}.';
 
-    return Card(
-      color: Theme.of(context).colorScheme.tertiaryContainer,
-      child: ListTile(
-        leading: const Icon(Icons.wifi_off),
-        title: const Text('Modo offline'),
-        subtitle: Text('Mostrando dados salvos no aparelho.$quando'),
+    return SecaoLista(children: [
+      ItemLista(
+        inicio: Icon(icone(context, material: Icons.wifi_off, ios: CupertinoIcons.wifi_slash), color: corLaranja(context)),
+        titulo: 'Modo offline',
+        subtitulo: 'Mostrando dados salvos no aparelho.$quando',
       ),
-    );
+    ]);
   }
 }
 
@@ -88,14 +91,18 @@ class CampoBusca extends StatefulWidget {
   final String dica;
   final ValueChanged<String> aoBuscar;
 
-  const CampoBusca({super.key, required this.dica, required this.aoBuscar});
+  /// Busca atual: a lista recarrega a cada busca e o campo e recriado; sem isto ele voltaria
+  /// vazio com a lista ainda filtrada.
+  final String? texto;
+
+  const CampoBusca({super.key, required this.dica, required this.aoBuscar, this.texto});
 
   @override
   State<CampoBusca> createState() => _CampoBuscaState();
 }
 
 class _CampoBuscaState extends State<CampoBusca> {
-  final _controle = TextEditingController();
+  late final _controle = TextEditingController(text: widget.texto);
 
   @override
   void dispose() {
@@ -105,6 +112,31 @@ class _CampoBuscaState extends State<CampoBusca> {
 
   @override
   Widget build(BuildContext context) {
+    if (!ehIOS(context)) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: SearchBar(
+          controller: _controle,
+          hintText: widget.dica,
+          leading: const Icon(Icons.search),
+          elevation: const WidgetStatePropertyAll(0),
+          onSubmitted: widget.aoBuscar,
+          onChanged: (texto) {
+            if (texto.isEmpty) widget.aoBuscar('');
+          },
+          trailing: [
+            IconButton(
+              tooltip: 'Limpar busca',
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                _controle.clear();
+                widget.aoBuscar('');
+              },
+            ),
+          ],
+        ),
+      );
+    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
       child: CupertinoSearchTextField(
@@ -123,10 +155,6 @@ class _CampoBuscaState extends State<CampoBusca> {
   }
 }
 
-void mostrarMensagem(BuildContext context, String mensagem) {
-  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(mensagem)));
-}
-
 /// Botao principal de cadastro no topo das listas (Produtos, Clientes, Pedidos): largura
 /// total e cantos arredondados, no estilo dos apps do iPhone, em vez de botao flutuante.
 class BotaoNovo extends StatelessWidget {
@@ -137,36 +165,18 @@ class BotaoNovo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Mesma margem das secoes de lista (20 no iPhone, 16 no Android).
+    final margem = ehIOS(context) ? 20.0 : 16.0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      child: FilledButton.icon(
-        onPressed: aoTocar,
-        icon: const Icon(Icons.add),
-        label: Text(texto),
-      ),
+      padding: EdgeInsets.fromLTRB(margem, 4, margem, 8),
+      child: Botao.principal(texto, iconeMaterial: Icons.add, iconeIOS: CupertinoIcons.add, aoTocar: aoTocar),
     );
   }
 }
 
 /// Pergunta antes de excluir; devolve true so quando o usuario confirma.
-Future<bool> confirmarExclusao(BuildContext context, {required String titulo, required String mensagem}) async {
-  final resposta = await showDialog<bool>(
-    context: context,
-    builder: (contexto) => AlertDialog(
-      title: Text(titulo),
-      content: Text(mensagem),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(contexto, false), child: const Text('Cancelar')),
-        FilledButton(
-          style: FilledButton.styleFrom(backgroundColor: Theme.of(contexto).colorScheme.error),
-          onPressed: () => Navigator.pop(contexto, true),
-          child: const Text('Excluir'),
-        ),
-      ],
-    ),
-  );
-  return resposta == true;
-}
+Future<bool> confirmarExclusao(BuildContext context, {required String titulo, required String mensagem}) =>
+    confirmar(context, titulo: titulo, mensagem: mensagem, acao: 'Apagar');
 
 /// Botao vermelho de apagar no fim da tela de edicao, como "Apagar Contato" no app Contatos.
 class BotaoApagar extends StatelessWidget {
@@ -177,6 +187,14 @@ class BotaoApagar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (ehIOS(context)) {
+      return SecaoLista(children: [
+        CupertinoListTile(
+          title: Text(texto, style: TextStyle(color: CupertinoColors.destructiveRed.resolveFrom(context))),
+          onTap: aoTocar,
+        ),
+      ]);
+    }
     final cores = Theme.of(context).colorScheme;
     return Material(
       color: cores.surface,
@@ -214,6 +232,10 @@ class ArrastarParaApagar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!permitido) return child;
+    // iPhone: deslizar revela o botao "Apagar" (padrao do iOS). Android: arrastar e soltar.
+    if (ehIOS(context)) {
+      return DeslizarParaApagarIOS(key: chave, aoApagar: aoApagar, aoRemover: aoRemover, child: child);
+    }
     return Dismissible(
       key: chave,
       direction: DismissDirection.endToStart,
@@ -223,12 +245,12 @@ class ArrastarParaApagar extends StatelessWidget {
         color: Theme.of(context).colorScheme.error,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 24),
-        child: const Column(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.delete_outline, color: Colors.white),
-            SizedBox(height: 2),
-            Text('Apagar', style: TextStyle(color: Colors.white, fontSize: 12)),
+            Icon(icone(context, material: Icons.delete_outline, ios: CupertinoIcons.trash), color: Colors.white),
+            const SizedBox(height: 2),
+            const Text('Apagar', style: TextStyle(color: Colors.white, fontSize: 12)),
           ],
         ),
       ),

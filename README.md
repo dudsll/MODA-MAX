@@ -159,6 +159,14 @@ No login, os botões **Diretoria**, **Gerência** e **Vendas** preenchem os aces
 
 O que o app faz: painel com anéis de meta e reposição, com cada indicador abrindo a tela correspondente (cada aba mantém a sua navegação e a barra inferior fica sempre visível); produtos agrupados por modelo, com os itens (tamanho e cor) dentro da tela do modelo, filtros por tipo, fornecedor, tamanho, cor, disponibilidade e preço, leitor de código de barras, entrada de estoque e cadastro, edição e exclusão com foto pela câmera; clientes com ficha no estilo do app Contatos; pedidos com forma de pagamento e PIX copia e cola. Para apagar um cliente ou produto, use **Apagar** no fim da tela de edição ou arraste o item da lista para a esquerda (cliente: gerência e diretoria; produto: diretoria; quem já tem pedidos não pode ser apagado).
 
+**Visual de cada sistema.** O app usa os componentes nativos de cada plataforma, com a mesma lógica: no iPhone, os da Apple (Cupertino) — barra de abas e títulos grandes do iOS, listas agrupadas, formulários como os de Contatos, alertas e menus de ação do iOS, deslizar para revelar "Apagar", puxar para atualizar e a tipografia San Francisco; no Android, os do Material 3. As peças ficam em `lib/widgets/adaptativo.dart`.
+
+**Teste de ponta a ponta.** `integration_test/fluxos_test.dart` abre o app de verdade e percorre os fluxos principais (login, painel, busca, filtros, itens, clientes, pedidos com PIX e cartão, cancelamento). Com a API rodando em modo demonstração e um simulador ligado (a partir de uma pasta fora do iCloud, como no script do iPhone):
+
+```bash
+flutter test integration_test -d <id-do-simulador>
+```
+
 #### No iPhone (pelo cabo)
 
 1. Suba a API aceitando conexões da rede:

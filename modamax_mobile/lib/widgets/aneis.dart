@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import 'adaptativo.dart';
 
 /// Aneis de meta no estilo do app Atividade (Apple Watch): faturamento, pedidos e pecas.
 /// Desenhados com CustomPainter, sem pacotes extras.
@@ -15,7 +16,6 @@ class AneisMeta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textos = Theme.of(context).textTheme;
     final itens = [
       ('Faturamento', meta.faturamento, '${formatarMoeda(meta.faturamento.realizado)} de ${formatarMoeda(meta.faturamento.meta)}'),
       ('Pedidos', meta.pedidos, '${meta.pedidos.realizado.toStringAsFixed(0)} de ${meta.pedidos.meta.toStringAsFixed(0)}'),
@@ -44,18 +44,18 @@ class AneisMeta extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     child: Row(
                       children: [
-                        CircleAvatar(radius: 5, backgroundColor: cores[n]),
+                        Container(width: 10, height: 10, decoration: BoxDecoration(color: cores[n], shape: BoxShape.circle)),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(itens[n].$1, style: textos.bodySmall),
-                              Text(itens[n].$3, style: textos.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
+                              Text(itens[n].$1, style: estiloLegenda(context)),
+                              Text(itens[n].$3, style: estiloCorpo(context).copyWith(fontSize: 15, fontWeight: FontWeight.w600)),
                             ],
                           ),
                         ),
-                        Text('${itens[n].$2.percentual}%', style: textos.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+                        Text('${itens[n].$2.percentual}%', style: estiloSubtitulo(context).copyWith(fontWeight: FontWeight.w700)),
                       ],
                     ),
                   ),

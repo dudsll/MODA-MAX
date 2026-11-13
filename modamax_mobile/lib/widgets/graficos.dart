@@ -1,6 +1,8 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
+import 'adaptativo.dart';
 
 /// Grafico de barras feito so com widgets do Flutter (sem pacote externo).
 /// Cada barra tem um rotulo de acessibilidade com o valor, lido pelo leitor de tela.
@@ -20,37 +22,31 @@ class GraficoBarras extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tema = Theme.of(context);
     final maximo = pontos.fold<double>(0, (m, p) => p.valor > m ? p.valor : m);
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(titulo, style: tema.textTheme.titleMedium),
-            const SizedBox(height: 16),
-            if (pontos.isEmpty || maximo == 0)
-              const Text('Sem dados no período.')
-            else if (horizontal)
-              ...pontos.map((p) => _barraHorizontal(context, p, maximo))
-            else
-              SizedBox(
-                height: 170,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: pontos.map((p) => Expanded(child: _barraVertical(context, p, maximo))).toList(),
-                ),
-              ),
-          ],
-        ),
-      ),
+    // Sem cartao proprio: quem usa decide o fundo (cartao do painel no iPhone e no Android).
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(titulo, style: estiloSubtitulo(context)),
+        const SizedBox(height: 16),
+        if (pontos.isEmpty || maximo == 0)
+          const Text('Sem dados no período.')
+        else if (horizontal)
+          ...pontos.map((p) => _barraHorizontal(context, p, maximo))
+        else
+          SizedBox(
+            height: 170,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: pontos.map((p) => Expanded(child: _barraVertical(context, p, maximo))).toList(),
+            ),
+          ),
+      ],
     );
   }
 
   Widget _barraVertical(BuildContext context, PontoGrafico p, double maximo) {
-    final cores = Theme.of(context).colorScheme;
     return Semantics(
       label: '${p.rotulo}: ${formatar(p.valor)}',
       excludeSemantics: true,
@@ -66,7 +62,7 @@ class GraficoBarras extends StatelessWidget {
                   heightFactor: (p.valor / maximo).clamp(0.02, 1.0),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: cores.primary,
+                      color: corDestaque(context),
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
                     ),
                   ),
@@ -74,7 +70,7 @@ class GraficoBarras extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            Text(p.rotulo, style: Theme.of(context).textTheme.labelSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+            Text(p.rotulo, style: estiloLegenda(context).copyWith(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
         ),
       ),
@@ -82,7 +78,6 @@ class GraficoBarras extends StatelessWidget {
   }
 
   Widget _barraHorizontal(BuildContext context, PontoGrafico p, double maximo) {
-    final cores = Theme.of(context).colorScheme;
     return Semantics(
       label: '${p.rotulo}: ${formatar(p.valor)}',
       excludeSemantics: true,
@@ -103,8 +98,8 @@ class GraficoBarras extends StatelessWidget {
               child: LinearProgressIndicator(
                 value: p.valor / maximo,
                 minHeight: 10,
-                color: cores.tertiary,
-                backgroundColor: cores.surfaceContainerHighest,
+                color: corDoSistema(context, CupertinoColors.systemIndigo, Theme.of(context).colorScheme.tertiary),
+                backgroundColor: corTrilho(context),
               ),
             ),
           ],
