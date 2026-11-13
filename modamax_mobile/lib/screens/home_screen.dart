@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -71,15 +72,47 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _construirAba(int indice, Widget raiz) => Navigator(
         key: _navegadores[indice],
         onGenerateRoute: (_) => MaterialPageRoute(
-          builder: (_) => Scaffold(
-            appBar: AppBar(
-              title: Text(_titulos[indice]),
-              actions: [IconButton(tooltip: 'Sair', icon: const Icon(Icons.logout), onPressed: _sair)],
-            ),
-            body: raiz,
+          builder: (_) => Pagina(
+            titulo: _titulos[indice],
+            tituloGrande: true,
+            acoes: [
+              BotaoTopo(rotulo: 'Sair', iconeMaterial: Icons.logout, aoTocar: _sair),
+            ],
+            corpo: raiz,
           ),
         ),
       );
+
+  static const _iconesIOS = [
+    (CupertinoIcons.square_grid_2x2, CupertinoIcons.square_grid_2x2_fill),
+    (CupertinoIcons.tag, CupertinoIcons.tag_fill),
+    (CupertinoIcons.person_2, CupertinoIcons.person_2_fill),
+    (CupertinoIcons.doc_text, CupertinoIcons.doc_text_fill),
+  ];
+
+  /// Barra inferior: a do iOS no iPhone e a do Material 3 no Android.
+  Widget _barraInferior(BuildContext context) {
+    if (ehIOS(context)) {
+      return CupertinoTabBar(
+        currentIndex: _aba,
+        onTap: _tocarAba,
+        items: [
+          for (final (i, titulo) in _titulos.indexed)
+            BottomNavigationBarItem(icon: Icon(_iconesIOS[i].$1), activeIcon: Icon(_iconesIOS[i].$2), label: titulo),
+        ],
+      );
+    }
+    return NavigationBar(
+      selectedIndex: _aba,
+      onDestinationSelected: _tocarAba,
+      destinations: const [
+        NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Painel'),
+        NavigationDestination(icon: Icon(Icons.checkroom_outlined), selectedIcon: Icon(Icons.checkroom), label: 'Produtos'),
+        NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'Clientes'),
+        NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Pedidos'),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,16 +146,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _construirAba(_abaPedidos, const PedidosScreen()),
           ],
         ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _aba,
-          onDestinationSelected: _tocarAba,
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.dashboard_outlined), label: 'Painel'),
-            NavigationDestination(icon: Icon(Icons.checkroom_outlined), label: 'Produtos'),
-            NavigationDestination(icon: Icon(Icons.people_outline), label: 'Clientes'),
-            NavigationDestination(icon: Icon(Icons.receipt_long_outlined), label: 'Pedidos'),
-          ],
-        ),
+        bottomNavigationBar: _barraInferior(context),
       ),
     );
   }
@@ -168,56 +192,88 @@ class _PainelTabState extends State<_PainelTab> {
       aoAtualizar: _atualizar,
       construir: (dados) {
         final d = dados.valor;
-        return ListView(
-          padding: const EdgeInsets.all(16),
+        final ios = ehIOS(context);
+        return ListaAtualizavel(
+          aoAtualizar: _atualizar,
           children: [
             if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
-            Text('Olá, ${usuario?.nome ?? ''}', style: Theme.of(context).textTheme.titleLarge),
-            Text('Nível de acesso: ${usuario?.nivel ?? '-'}'),
-            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Olá, ${usuario?.nome ?? ''}', style: estiloTitulo(context)),
+                  Text('Nível de acesso: ${usuario?.nivel ?? '-'}', style: estiloSecundario(context)),
+                ],
+              ),
+            ),
             FutureBuilder<Dados<MetaAtual>>(
               future: _meta,
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const SizedBox.shrink();
                 final meta = snapshot.data!.valor;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Metas · ${meta.mes}', style: Theme.of(context).textTheme.titleMedium),
-                        const SizedBox(height: 12),
-                        AneisMeta(meta: meta),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Projeção do mês: ${formatarMoeda(meta.projecaoFaturamento)} · ${meta.diasRestantes} dias restantes',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
+                return _Cartao(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Metas · ${meta.mes}', style: estiloSubtitulo(context)),
+                      const SizedBox(height: 12),
+                      AneisMeta(meta: meta),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Projeção do mês: ${formatarMoeda(meta.projecaoFaturamento)} · ${meta.diasRestantes} dias restantes',
+                        style: estiloLegenda(context),
+                      ),
+                    ],
                   ),
                 );
               },
             ),
-            _Indicador(
-              icone: Icons.attach_money,
-              titulo: 'Faturamento',
-              valor: formatarMoeda(d.faturamentoTotal),
-              aoTocar: () => widget.aoAbrirAba(3),
+            SecaoLista(
+              cabecalho: 'Resumo',
+              children: [
+                _Indicador(
+                  icone: ios ? CupertinoIcons.money_dollar_circle : Icons.attach_money,
+                  cor: corVerde(context),
+                  titulo: 'Faturamento',
+                  valor: formatarMoeda(d.faturamentoTotal),
+                  aoTocar: () => widget.aoAbrirAba(3),
+                ),
+                _Indicador(
+                  icone: ios ? CupertinoIcons.doc_text : Icons.receipt_long,
+                  cor: corIndigo(context),
+                  titulo: 'Pedidos',
+                  valor: '${d.totalPedidos}',
+                  aoTocar: () => widget.aoAbrirAba(3),
+                ),
+                _Indicador(
+                  icone: ios ? CupertinoIcons.tag : Icons.checkroom,
+                  cor: corAzul(context),
+                  titulo: 'Produtos',
+                  valor: '${d.totalProdutos}',
+                  aoTocar: () => widget.aoAbrirAba(1),
+                ),
+                _Indicador(
+                  icone: ios ? CupertinoIcons.person_2 : Icons.people,
+                  cor: corTeal(context),
+                  titulo: 'Clientes',
+                  valor: '${d.totalClientes}',
+                  aoTocar: () => widget.aoAbrirAba(2),
+                ),
+                _Indicador(
+                  icone: ios ? CupertinoIcons.exclamationmark_triangle : Icons.warning_amber,
+                  cor: d.produtosEstoqueBaixo > 0 ? corLaranja(context) : corCinza(context),
+                  titulo: 'Estoque baixo',
+                  valor: '${d.produtosEstoqueBaixo}',
+                  aoTocar: widget.aoMostrarEstoqueBaixo,
+                ),
+              ],
             ),
-            _Indicador(icone: Icons.receipt_long, titulo: 'Pedidos', valor: '${d.totalPedidos}', aoTocar: () => widget.aoAbrirAba(3)),
-            _Indicador(icone: Icons.checkroom, titulo: 'Produtos', valor: '${d.totalProdutos}', aoTocar: () => widget.aoAbrirAba(1)),
-            _Indicador(icone: Icons.people, titulo: 'Clientes', valor: '${d.totalClientes}', aoTocar: () => widget.aoAbrirAba(2)),
-            _Indicador(
-              icone: Icons.warning_amber,
-              titulo: 'Produtos com estoque baixo',
-              valor: '${d.produtosEstoqueBaixo}',
-              destaque: d.produtosEstoqueBaixo > 0,
-              aoTocar: widget.aoMostrarEstoqueBaixo,
+            _Reposicao(
+              futuro: _reposicao,
+              aoVerTodos: widget.aoMostrarEstoqueBaixo,
+              aoAbrirProduto: widget.aoAbrirProduto,
             ),
-            const SizedBox(height: 8),
             FutureBuilder<Dados<GraficosDashboard>>(
               future: _graficos,
               builder: (context, snapshot) {
@@ -225,17 +281,14 @@ class _PainelTabState extends State<_PainelTab> {
                 final g = snapshot.data!.valor;
                 return Column(
                   children: [
-                    _CartaoReposicao(
-                      futuro: _reposicao,
-                      aoVerTodos: widget.aoMostrarEstoqueBaixo,
-                      aoAbrirProduto: widget.aoAbrirProduto,
-                    ),
-                    GraficoBarras(titulo: 'Faturamento por mês', pontos: g.vendasPorMes, formatar: formatarMoeda),
-                    GraficoBarras(
-                      titulo: 'Mais vendidos',
-                      pontos: g.produtosMaisVendidos,
-                      formatar: (v) => '${v.toStringAsFixed(0)} un.',
-                      horizontal: true,
+                    _Cartao(child: GraficoBarras(titulo: 'Faturamento por mês', pontos: g.vendasPorMes, formatar: formatarMoeda)),
+                    _Cartao(
+                      child: GraficoBarras(
+                        titulo: 'Mais vendidos',
+                        pontos: g.produtosMaisVendidos,
+                        formatar: (v) => '${v.toStringAsFixed(0)} un.',
+                        horizontal: true,
+                      ),
                     ),
                   ],
                 );
@@ -248,50 +301,53 @@ class _PainelTabState extends State<_PainelTab> {
   }
 }
 
-class _Indicador extends StatelessWidget {
-  final IconData icone;
-  final String titulo;
-  final String valor;
-  final bool destaque;
-  final VoidCallback aoTocar;
+/// Cartao branco arredondado com a mesma margem das secoes de lista.
+class _Cartao extends StatelessWidget {
+  final Widget child;
 
-  const _Indicador({
-    required this.icone,
-    required this.titulo,
-    required this.valor,
-    required this.aoTocar,
-    this.destaque = false,
-  });
+  const _Cartao({required this.child});
 
   @override
   Widget build(BuildContext context) {
-    final cores = Theme.of(context).colorScheme;
-    return Card(
-      color: destaque ? cores.errorContainer : null,
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-        onTap: aoTocar,
-        leading: Icon(icone),
-        title: Text(titulo),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(valor, style: Theme.of(context).textTheme.titleMedium),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
+    final ios = ehIOS(context);
+    return Container(
+      margin: EdgeInsets.fromLTRB(ios ? 20 : 16, 8, ios ? 20 : 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: ios ? CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context) : Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(ios ? 10 : 16),
       ),
+      child: child,
     );
   }
 }
 
-/// Produtos que acabam antes da proxima entrega, vindos da central de reposicao da API.
-class _CartaoReposicao extends StatelessWidget {
+class _Indicador extends StatelessWidget {
+  final IconData icone;
+  final Color cor;
+  final String titulo;
+  final String valor;
+  final VoidCallback aoTocar;
+
+  const _Indicador({required this.icone, required this.cor, required this.titulo, required this.valor, required this.aoTocar});
+
+  @override
+  Widget build(BuildContext context) => ItemLista(
+        inicio: Icon(icone, color: cor),
+        titulo: titulo,
+        valor: valor,
+        seta: true,
+        aoTocar: aoTocar,
+      );
+}
+
+/// Itens que acabam antes da proxima entrega, vindos da central de reposicao da API.
+class _Reposicao extends StatelessWidget {
   final Future<Dados<List<ItemReposicao>>> futuro;
   final VoidCallback aoVerTodos;
   final ValueChanged<String> aoAbrirProduto;
 
-  const _CartaoReposicao({required this.futuro, required this.aoVerTodos, required this.aoAbrirProduto});
+  const _Reposicao({required this.futuro, required this.aoVerTodos, required this.aoAbrirProduto});
 
   @override
   Widget build(BuildContext context) {
@@ -300,35 +356,31 @@ class _CartaoReposicao extends StatelessWidget {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const SizedBox.shrink();
         final repor = snapshot.data!.valor.where((r) => r.situacao != 'Ok').toList();
-        final cores = Theme.of(context).colorScheme;
-        return Card(
-          margin: const EdgeInsets.only(bottom: 12),
-          clipBehavior: Clip.antiAlias,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ListTile(
-                onTap: aoVerTodos,
-                trailing: const Icon(Icons.chevron_right),
-                leading: Icon(Icons.inventory_2_outlined, color: cores.primary),
-                title: const Text('Precisam de reposição'),
-                subtitle: Text(repor.isEmpty ? 'Todos os produtos estão com estoque em dia.' : '${repor.length} produto(s) pela previsão de vendas'),
+        return SecaoLista(
+          cabecalho: 'Precisam de reposição',
+          rodape: repor.isEmpty
+              ? 'Todos os produtos estão com estoque em dia.'
+              : '${repor.length} item(ns) acabam antes da próxima entrega, pela previsão de vendas.',
+          children: [
+            for (final r in repor.take(4))
+              ItemLista(
+                inicio: Icon(Icons.circle, size: 12, color: r.critico ? corVermelha(context) : corLaranja(context),
+                    semanticLabel: r.critico ? 'Crítico' : 'Atenção'),
+                titulo: r.produto,
+                subtitulo: 'Estoque ${r.estoque} · dura ${r.diasDeCobertura ?? '-'} dias',
+                valor: 'Comprar ${r.quantidadeSugerida}',
+                seta: true,
+                aoTocar: () => aoAbrirProduto(r.produto),
               ),
-              for (final r in repor.take(4))
-                ListTile(
-                  dense: true,
-                  onTap: () => aoAbrirProduto(r.produto),
-                  leading: Icon(Icons.circle, size: 12, color: r.critico ? Colors.red : Colors.orange,
-                      semanticLabel: r.critico ? 'Crítico' : 'Atenção'),
-                  title: Text(r.produto),
-                  subtitle: Text('Estoque ${r.estoque} · dura ${r.diasDeCobertura ?? '-'} dias'),
-                  trailing: Text('Comprar ${r.quantidadeSugerida}', style: const TextStyle(fontWeight: FontWeight.w600)),
-                ),
-            ],
-          ),
+            if (repor.isNotEmpty)
+              ItemLista(
+                titulo: 'Ver todos com estoque baixo',
+                seta: true,
+                aoTocar: aoVerTodos,
+              ),
+          ],
         );
       },
     );
   }
 }
-

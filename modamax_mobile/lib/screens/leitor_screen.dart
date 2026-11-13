@@ -1,7 +1,9 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../codigo_barras.dart';
+import '../widgets/adaptativo.dart';
 
 /// Abre a camera e devolve o codigo de barras lido (EAN/GTIN com digito verificador valido).
 /// Tambem permite digitar o codigo: ajuda quem nao consegue mirar a camera e funciona no emulador.
@@ -38,10 +40,9 @@ class _LeitorCodigoScreenState extends State<LeitorCodigoScreen> {
   }
 
   Future<void> _digitar() async {
-    final codigo = await showDialog<String>(
-      context: context,
-      builder: (context) => const _DialogoCodigo(),
-    );
+    final codigo = ehIOS(context)
+        ? await showCupertinoDialog<String>(context: context, builder: (_) => const _DialogoCodigo())
+        : await showDialog<String>(context: context, builder: (_) => const _DialogoCodigo());
     if (codigo != null && mounted) {
       _concluido = true;
       Navigator.of(context).pop(codigo);
@@ -56,56 +57,58 @@ class _LeitorCodigoScreenState extends State<LeitorCodigoScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
-        title: Text(widget.titulo),
-        actions: [
-          IconButton(
-            tooltip: 'Ligar ou desligar a lanterna',
-            icon: const Icon(Icons.flashlight_on),
-            onPressed: _controller.toggleTorch,
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          MobileScanner(controller: _controller, onDetect: _aoDetectar),
-          // Moldura que indica onde posicionar a etiqueta.
-          Center(
-            child: Container(
-              width: 280,
-              height: 160,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 3),
-                borderRadius: BorderRadius.circular(12),
+    return Pagina(
+      titulo: widget.titulo,
+      acoes: [
+        BotaoTopo(
+          rotulo: 'Lanterna',
+          iconeMaterial: Icons.flashlight_on,
+          iconeIOS: CupertinoIcons.bolt_fill,
+          aoTocar: _controller.toggleTorch,
+        ),
+      ],
+      corpo: ColoredBox(
+        color: Colors.black,
+        child: Stack(
+          children: [
+            MobileScanner(controller: _controller, onDetect: _aoDetectar),
+            // Moldura que indica onde posicionar a etiqueta.
+            Center(
+              child: Container(
+                width: 280,
+                height: 160,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white, width: 3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
-          ),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: 24,
-            child: SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Aponte a câmera para o código de barras da etiqueta.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.tonalIcon(
-                    onPressed: _digitar,
-                    icon: const Icon(Icons.keyboard),
-                    label: const Text('Digitar o código'),
-                  ),
-                ],
+            Positioned(
+              left: 20,
+              right: 20,
+              bottom: 24,
+              child: SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Aponte a câmera para o código de barras da etiqueta.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                    const SizedBox(height: 12),
+                    Botao.principal(
+                      'Digitar o código',
+                      iconeMaterial: Icons.keyboard,
+                      iconeIOS: CupertinoIcons.keyboard,
+                      aoTocar: _digitar,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -139,6 +142,34 @@ class _DialogoCodigoState extends State<_DialogoCodigo> {
 
   @override
   Widget build(BuildContext context) {
+    if (ehIOS(context)) {
+      return CupertinoAlertDialog(
+        title: const Text('Digitar código de barras'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            children: [
+              CupertinoTextField(
+                controller: _texto,
+                autofocus: true,
+                placeholder: 'EAN/GTIN',
+                keyboardType: TextInputType.number,
+                onSubmitted: (_) => _confirmar(),
+              ),
+              if (_erro != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(_erro!, style: TextStyle(color: CupertinoColors.destructiveRed.resolveFrom(context), fontSize: 13)),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar')),
+          CupertinoDialogAction(isDefaultAction: true, onPressed: _confirmar, child: const Text('Buscar')),
+        ],
+      );
+    }
     return AlertDialog(
       title: const Text('Digitar código de barras'),
       content: TextField(

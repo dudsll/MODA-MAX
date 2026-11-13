@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -71,26 +72,13 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
   }
 
   Future<void> _escolherFoto() async {
-    final origem = await showModalBottomSheet<ImageSource>(
-      context: context,
-      useRootNavigator: true,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Tirar foto'),
-              onTap: () => Navigator.pop(context, ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Escolher da galeria'),
-              onTap: () => Navigator.pop(context, ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
+    final origem = await escolherAcao<ImageSource>(
+      context,
+      titulo: 'Foto do produto',
+      opcoes: const [
+        OpcaoAcao(ImageSource.camera, 'Tirar foto', Icons.photo_camera_outlined),
+        OpcaoAcao(ImageSource.gallery, 'Escolher da galeria', Icons.photo_library_outlined),
+      ],
     );
     if (origem == null) return;
 
@@ -158,18 +146,22 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
     if (apagou) Navigator.of(context).pop(true);
   }
 
-  String? _obrigatorio(String? v) => (v == null || v.trim().isEmpty) ? 'Campo obrigatório.' : null;
+  String? _obrigatorio(String v) => v.trim().isEmpty ? 'Campo obrigatório.' : null;
 
   @override
   Widget build(BuildContext context) {
+    final ios = ehIOS(context);
+    final titulo = _editando ? 'Editar item' : widget.modelo != null ? 'Novo item' : 'Novo produto';
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (saiu, _) {
         if (!saiu) Navigator.of(context).pop(_alterado);
       },
-      child: Scaffold(
-        appBar: AppBar(title: Text(_editando ? 'Editar item' : widget.modelo != null ? 'Novo item' : 'Novo produto')),
-        body: FutureBuilder<(List<Categoria>, List<Fornecedor>)>(
+      child: Pagina(
+        titulo: titulo,
+        // No iPhone o "Salvar" fica no canto superior, como nos apps da Apple.
+        acoes: ios ? [BotaoTopo(rotulo: 'Salvar', aoTocar: _salvando ? null : _salvar)] : const [],
+        corpo: FutureBuilder<(List<Categoria>, List<Fornecedor>)>(
           future: _opcoes,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
@@ -178,133 +170,96 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('${snapshot.error}'),
-                    TextButton(
-                      onPressed: () => setState(() => _opcoes = _carregarOpcoes()),
-                      child: const Text('Tentar novamente'),
-                    ),
+                    Botao.texto('Tentar novamente', aoTocar: () => setState(() { _opcoes = _carregarOpcoes(); })),
                   ],
                 ),
               );
             }
-            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator.adaptive());
             final (categorias, fornecedores) = snapshot.data!;
 
             return Form(
               key: _form,
               child: ListView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.only(bottom: 32),
                 children: [
+                  const SizedBox(height: 12),
                   Center(child: _Foto(original: _base, nova: _novaFoto, aoTocar: _escolherFoto)),
-                  const SizedBox(height: 20),
-                  TextFormField(
-                    controller: _nome,
-                    decoration: const InputDecoration(labelText: 'Nome'),
-                    textCapitalization: TextCapitalization.sentences,
-                    validator: _obrigatorio,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _descricao,
-                    decoration: const InputDecoration(labelText: 'Descrição (opcional)'),
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _tamanho,
-                          decoration: const InputDecoration(labelText: 'Tamanho'),
-                          textCapitalization: TextCapitalization.characters,
-                          validator: _obrigatorio,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _cor,
-                          decoration: const InputDecoration(labelText: 'Cor'),
-                          textCapitalization: TextCapitalization.sentences,
-                          validator: _obrigatorio,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _preco,
-                          decoration: const InputDecoration(labelText: 'Preço (R\$)'),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          validator: (v) {
-                            final valor = lerPreco(v);
-                            return valor == null || valor <= 0 ? 'Informe um preço válido.' : null;
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _estoque,
-                          decoration: const InputDecoration(labelText: 'Estoque'),
-                          keyboardType: TextInputType.number,
-                          validator: (v) {
-                            final valor = int.tryParse((v ?? '').trim());
-                            return valor == null || valor < 0 ? 'Informe o estoque.' : null;
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    initialValue: _idCategoria,
-                    decoration: const InputDecoration(labelText: 'Categoria'),
-                    items: [
-                      for (final c in categorias) DropdownMenuItem(value: c.idCategoria, child: Text(c.nome)),
-                    ],
-                    onChanged: (v) => setState(() => _idCategoria = v),
-                    validator: (v) => v == null ? 'Escolha a categoria.' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    initialValue: _idFornecedor,
-                    decoration: const InputDecoration(labelText: 'Fornecedor'),
-                    items: [
-                      for (final f in fornecedores) DropdownMenuItem(value: f.idFornecedor, child: Text(f.nome)),
-                    ],
-                    onChanged: (v) => setState(() => _idFornecedor = v),
-                    validator: (v) => v == null ? 'Escolha o fornecedor.' : null,
-                  ),
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _codigo,
-                    decoration: InputDecoration(
-                      labelText: 'Código de barras (opcional)',
-                      suffixIcon: IconButton(
-                        tooltip: 'Ler com a câmera',
-                        icon: const Icon(Icons.qr_code_scanner),
-                        onPressed: _lerCodigo,
+                  SecaoFormulario(children: [
+                    CampoTexto(controle: _nome, rotulo: 'Nome', maiusculas: TextCapitalization.sentences, validar: _obrigatorio),
+                    CampoTexto(controle: _descricao, rotulo: 'Descrição', dica: 'Opcional', maxLinhas: 2),
+                  ]),
+                  SecaoFormulario(cabecalho: 'Item', children: [
+                    CampoTexto(controle: _tamanho, rotulo: 'Tamanho', maiusculas: TextCapitalization.characters, validar: _obrigatorio),
+                    CampoTexto(controle: _cor, rotulo: 'Cor', maiusculas: TextCapitalization.sentences, validar: _obrigatorio),
+                    CampoTexto(
+                      controle: _preco,
+                      rotulo: 'Preço (R\$)',
+                      dica: '0,00',
+                      teclado: const TextInputType.numberWithOptions(decimal: true),
+                      validar: (v) {
+                        final valor = lerPreco(v);
+                        return valor == null || valor <= 0 ? 'Informe um preço válido.' : null;
+                      },
+                    ),
+                    CampoTexto(
+                      controle: _estoque,
+                      rotulo: 'Estoque',
+                      teclado: TextInputType.number,
+                      validar: (v) {
+                        final valor = int.tryParse(v.trim());
+                        return valor == null || valor < 0 ? 'Informe o estoque.' : null;
+                      },
+                    ),
+                    CampoTexto(
+                      controle: _codigo,
+                      rotulo: 'Código',
+                      dica: 'Código de barras (opcional)',
+                      teclado: TextInputType.number,
+                      sufixo: ios
+                          ? CupertinoButton(
+                              padding: const EdgeInsets.only(right: 4),
+                              minimumSize: const Size(32, 32),
+                              onPressed: _lerCodigo,
+                              child: const Icon(CupertinoIcons.barcode_viewfinder, size: 22),
+                            )
+                          : IconButton(tooltip: 'Ler com a câmera', icon: const Icon(Icons.qr_code_scanner), onPressed: _lerCodigo),
+                      validar: (v) => (v.trim().isEmpty || codigoBarrasValido(v))
+                          ? null
+                          : 'Código inválido. Confira os números da etiqueta.',
+                    ),
+                  ]),
+                  SecaoFormulario(cabecalho: 'Classificação', children: [
+                    Seletor<int>(
+                      rotulo: 'Tipo de produto',
+                      valor: _idCategoria,
+                      opcoes: {for (final c in categorias) c.idCategoria: c.nome},
+                      aoMudar: (v) => setState(() => _idCategoria = v),
+                      validar: (v) => v == null ? 'Escolha o tipo de produto.' : null,
+                    ),
+                    Seletor<int>(
+                      rotulo: 'Fornecedor',
+                      valor: _idFornecedor,
+                      opcoes: {for (final f in fornecedores) f.idFornecedor: f.nome},
+                      aoMudar: (v) => setState(() => _idFornecedor = v),
+                      validar: (v) => v == null ? 'Escolha o fornecedor.' : null,
+                    ),
+                  ]),
+                  if (!ios)
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: Botao.principal(
+                        _editando ? 'Salvar alterações' : widget.modelo != null ? 'Adicionar item' : 'Cadastrar produto',
+                        carregando: _salvando,
+                        aoTocar: _salvar,
                       ),
                     ),
-                    keyboardType: TextInputType.number,
-                    validator: (v) => (v == null || v.trim().isEmpty || codigoBarrasValido(v))
-                        ? null
-                        : 'Código inválido. Confira os números da etiqueta.',
-                  ),
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _salvando ? null : _salvar,
-                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-                    child: _salvando
-                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2))
-                        : Text(_editando ? 'Salvar alterações' : widget.modelo != null ? 'Adicionar item' : 'Cadastrar produto'),
-                  ),
                   if (_editando && ApiService.instancia.podeExcluirProduto) ...[
-                    const SizedBox(height: 32),
-                    BotaoApagar(texto: 'Apagar Produto', aoTocar: _salvando ? null : _excluir),
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: ios ? 0 : 16),
+                      child: BotaoApagar(texto: 'Apagar Item', aoTocar: _salvando ? null : _excluir),
+                    ),
                   ],
                 ],
               ),
@@ -319,16 +274,16 @@ class _ProdutoFormScreenState extends State<ProdutoFormScreen> {
 /// Pergunta e apaga o produto pela API (somente diretoria). A API recusa produtos que ja
 /// foram vendidos; nesse caso mostra o aviso e devolve false.
 Future<bool> apagarProduto(BuildContext context, Produto produto) async {
-  final confirmar = await confirmarExclusao(
+  final confirmou = await confirmarExclusao(
     context,
-    titulo: 'Apagar produto?',
-    mensagem: '${produto.nome} será removido do catálogo. Produtos que já foram vendidos não podem ser apagados.',
+    titulo: 'Apagar item?',
+    mensagem: '${produto.nome} (tamanho ${produto.tamanho}, ${produto.cor}) será removido do catálogo. Itens que já foram vendidos não podem ser apagados.',
   );
-  if (!confirmar || !context.mounted) return false;
+  if (!confirmou || !context.mounted) return false;
 
   try {
     await ApiService.instancia.excluirProduto(produto.idProduto);
-    if (context.mounted) mostrarMensagem(context, 'Produto apagado.');
+    if (context.mounted) mostrarMensagem(context, 'Item apagado.');
     return true;
   } on ApiException catch (e) {
     if (context.mounted) mostrarMensagem(context, e.mensagem);
@@ -370,17 +325,18 @@ class _Foto extends StatelessWidget {
         width: 120,
         height: 120,
         color: cores.surfaceContainerHighest,
-        child: Icon(Icons.checkroom, size: 48, color: cores.onSurfaceVariant),
+        child: Icon(icone(context, material: Icons.checkroom, ios: CupertinoIcons.tag), size: 48, color: cores.onSurfaceVariant),
       );
     }
 
     return Column(
       children: [
         ClipOval(child: imagem),
-        TextButton.icon(
-          onPressed: aoTocar,
-          icon: const Icon(Icons.photo_camera_outlined),
-          label: Text(foto != null || original?.fotoUrl != null ? 'Trocar foto' : 'Adicionar foto'),
+        Botao.texto(
+          foto != null || original?.fotoUrl != null ? 'Trocar foto' : 'Adicionar foto',
+          iconeMaterial: Icons.photo_camera_outlined,
+          iconeIOS: CupertinoIcons.camera,
+          aoTocar: aoTocar,
         ),
       ],
     );

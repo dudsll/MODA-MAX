@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../catalogo.dart';
@@ -32,9 +33,10 @@ class ProdutosScreenState extends State<ProdutosScreen> {
     await _futuro;
   }
 
-  /// Usado pelo painel: abre a lista ja filtrada pelos tamanhos com estoque baixo.
+  /// Usado pelo painel: abre a lista ja filtrada pelos itens com estoque baixo.
   void mostrarEstoqueBaixo() {
-    setState(() => _filtro = FiltroProdutos(disponibilidade: Disponibilidade.estoqueBaixo, ordenacao: _filtro.ordenacao));
+    setState(
+        () => _filtro = FiltroProdutos(disponibilidade: Disponibilidade.estoqueBaixo, ordenacao: _filtro.ordenacao));
   }
 
   /// Usado pelo painel: recarrega a lista (ex.: depois de mudar algo em outra aba).
@@ -68,12 +70,9 @@ class ProdutosScreenState extends State<ProdutosScreen> {
   }
 
   Future<void> _abrirFiltros(List<Produto> produtos) async {
-    final escolhido = await showModalBottomSheet<FiltroProdutos>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => _FiltrosSheet(produtos: produtos, inicial: _filtro),
+    final escolhido = await abrirFolha<FiltroProdutos>(
+      context,
+      construir: (_, rolagem) => _FiltrosSheet(produtos: produtos, inicial: _filtro, rolagem: rolagem),
     );
     if (escolhido != null) setState(() => _filtro = escolhido);
   }
@@ -87,33 +86,37 @@ class ProdutosScreenState extends State<ProdutosScreen> {
       construir: (dados) {
         final produtos = dados.valor.where((p) => !_apagados.contains(p.idProduto)).toList();
         final modelos = _filtro.aplicar(produtos);
-        return ListView(
+        return ListaAtualizavel(
+          aoAtualizar: _atualizar,
           children: [
             CampoBusca(
               dica: 'Buscar produto ou código',
+              texto: _busca,
               aoBuscar: (texto) {
                 _busca = texto;
                 _atualizar();
               },
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: EdgeInsets.symmetric(horizontal: ehIOS(context) ? 20 : 16),
               child: Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _lerCodigo,
-                      icon: const Icon(Icons.qr_code_scanner),
-                      label: const Text('Ler código'),
+                    child: Botao.secundario(
+                      'Ler código',
+                      iconeMaterial: Icons.qr_code_scanner,
+                      iconeIOS: CupertinoIcons.barcode_viewfinder,
+                      aoTocar: _lerCodigo,
                     ),
                   ),
                   if (podeCadastrar) ...[
                     const SizedBox(width: 12),
                     Expanded(
-                      child: FilledButton.icon(
-                        onPressed: dados.doCache ? null : _novoProduto,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Novo produto'),
+                      child: Botao.principal(
+                        'Novo produto',
+                        iconeMaterial: Icons.add,
+                        iconeIOS: CupertinoIcons.add,
+                        aoTocar: dados.doCache ? null : _novoProduto,
                       ),
                     ),
                   ],
@@ -128,18 +131,24 @@ class ProdutosScreenState extends State<ProdutosScreen> {
             ),
             if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
             if (modelos.isEmpty)
-              ListTile(
-                title: Text(_filtro.vazio ? 'Nenhum produto encontrado.' : 'Nenhum produto com esses filtros.'),
-                subtitle: _filtro.vazio ? null : const Text('Toque em Filtros para mudar a seleção.'),
+              SecaoLista(
+                rodape: _filtro.vazio ? null : 'Toque em Filtros para mudar a seleção.',
+                children: [
+                  ItemLista(titulo: _filtro.vazio ? 'Nenhum produto encontrado.' : 'Nenhum produto com esses filtros.'),
+                ],
               ),
-            for (final m in modelos)
-              ArrastarParaApagar(
-                chave: ValueKey('modelo-${m.nome}'),
-                permitido: !dados.doCache && ApiService.instancia.podeExcluirProduto,
-                aoApagar: () => apagarModelo(context, m),
-                aoRemover: () => setState(() => _apagados.addAll(m.tamanhos.map((p) => p.idProduto))),
-                child: _ModeloTile(modelo: m, aoTocar: () => _abrirModelo(m)),
-              ),
+            SecaoLista(
+              children: [
+                for (final m in modelos)
+                  ArrastarParaApagar(
+                    chave: ValueKey('modelo-${m.nome}'),
+                    permitido: !dados.doCache && ApiService.instancia.podeExcluirProduto,
+                    aoApagar: () => apagarModelo(context, m),
+                    aoRemover: () => setState(() => _apagados.addAll(m.tamanhos.map((p) => p.idProduto))),
+                    child: _ModeloTile(modelo: m, aoTocar: () => _abrirModelo(m)),
+                  ),
+              ],
+            ),
           ],
         );
       },
@@ -159,6 +168,7 @@ class _BarraFiltros extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ios = ehIOS(context);
     final etiquetas = <Widget>[
       for (final c in filtro.categorias)
         _Etiqueta(c, () => aoMudar(filtro.copyWith(categorias: {...filtro.categorias}..remove(c)))),
@@ -166,8 +176,7 @@ class _BarraFiltros extends StatelessWidget {
         _Etiqueta(f, () => aoMudar(filtro.copyWith(fornecedores: {...filtro.fornecedores}..remove(f)))),
       for (final t in filtro.tamanhos)
         _Etiqueta('Tam. $t', () => aoMudar(filtro.copyWith(tamanhos: {...filtro.tamanhos}..remove(t)))),
-      for (final c in filtro.cores)
-        _Etiqueta(c, () => aoMudar(filtro.copyWith(cores: {...filtro.cores}..remove(c)))),
+      for (final c in filtro.cores) _Etiqueta(c, () => aoMudar(filtro.copyWith(cores: {...filtro.cores}..remove(c)))),
       if (filtro.disponibilidade != Disponibilidade.todos)
         _Etiqueta(nomesDisponibilidade[filtro.disponibilidade]!,
             () => aoMudar(filtro.copyWith(disponibilidade: Disponibilidade.todos))),
@@ -175,25 +184,31 @@ class _BarraFiltros extends StatelessWidget {
         _Etiqueta('${formatarMoeda(filtro.precoMinimo ?? 0)} a ${formatarMoeda(filtro.precoMaximo ?? 0)}',
             () => aoMudar(filtro.copyWith(limparPreco: true))),
     ];
-    final textos = Theme.of(context).textTheme;
+    final rotulo = filtro.vazio ? 'Filtros' : 'Filtros (${filtro.quantidade})';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      padding: EdgeInsets.fromLTRB(ios ? 20 : 16, 8, ios ? 20 : 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              FilledButton.tonalIcon(
-                onPressed: aoAbrir,
-                icon: const Icon(Icons.tune),
-                label: Text(filtro.vazio ? 'Filtros' : 'Filtros (${filtro.quantidade})'),
-              ),
+              ios
+                  ? CupertinoButton.tinted(
+                      sizeStyle: CupertinoButtonSize.small,
+                      onPressed: aoAbrir,
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(CupertinoIcons.slider_horizontal_3, size: 18),
+                        const SizedBox(width: 6),
+                        Text(rotulo),
+                      ]),
+                    )
+                  : FilledButton.tonalIcon(onPressed: aoAbrir, icon: const Icon(Icons.tune), label: Text(rotulo)),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   '$resultados ${resultados == 1 ? 'modelo' : 'modelos'} · ${nomesOrdenacao[filtro.ordenacao]}',
-                  style: textos.bodySmall,
+                  style: estiloLegenda(context),
                   textAlign: TextAlign.end,
                 ),
               ),
@@ -201,12 +216,18 @@ class _BarraFiltros extends StatelessWidget {
           ),
           if (etiquetas.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Wrap(spacing: 8, runSpacing: 4, children: [
+            Wrap(spacing: 8, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
               ...etiquetas,
-              TextButton(
-                onPressed: () => aoMudar(FiltroProdutos(ordenacao: filtro.ordenacao)),
-                child: const Text('Limpar'),
-              ),
+              ios
+                  ? CupertinoButton(
+                      sizeStyle: CupertinoButtonSize.small,
+                      onPressed: () => aoMudar(FiltroProdutos(ordenacao: filtro.ordenacao)),
+                      child: const Text('Limpar'),
+                    )
+                  : TextButton(
+                      onPressed: () => aoMudar(FiltroProdutos(ordenacao: filtro.ordenacao)),
+                      child: const Text('Limpar'),
+                    ),
             ]),
           ],
         ],
@@ -215,6 +236,7 @@ class _BarraFiltros extends StatelessWidget {
   }
 }
 
+/// Filtro escolhido: "pilula" com o x para remover (iPhone) ou chip do Material (Android).
 class _Etiqueta extends StatelessWidget {
   final String texto;
   final VoidCallback aoRemover;
@@ -222,20 +244,37 @@ class _Etiqueta extends StatelessWidget {
   const _Etiqueta(this.texto, this.aoRemover);
 
   @override
-  Widget build(BuildContext context) => InputChip(
-        label: Text(texto),
-        onDeleted: aoRemover,
-        deleteButtonTooltipMessage: 'Remover filtro $texto',
-      );
+  Widget build(BuildContext context) {
+    if (!ehIOS(context)) {
+      return InputChip(label: Text(texto), onDeleted: aoRemover, deleteButtonTooltipMessage: 'Remover filtro $texto');
+    }
+    // Filtro escolhido: botao "tingido" pequeno do iOS com o x de remover.
+    return Semantics(
+      button: true,
+      label: 'Remover filtro $texto',
+      excludeSemantics: true,
+      child: CupertinoButton.tinted(
+        sizeStyle: CupertinoButtonSize.small,
+        onPressed: aoRemover,
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(texto),
+          const SizedBox(width: 4),
+          const Icon(CupertinoIcons.xmark_circle_fill, size: 16),
+        ]),
+      ),
+    );
+  }
 }
 
-/// Folha de filtros: tipo de produto, fornecedor, tamanho, cor, disponibilidade, faixa de
-/// preco e ordenacao. Mostra quantos modelos vao aparecer antes de aplicar.
+/// Folha de filtros: ordenacao, tipo de produto, fornecedor, tamanho, cor, disponibilidade e
+/// faixa de preco. No iPhone as opcoes sao listas com marcacao (como em Ajustes); no Android,
+/// chips. Mostra quantos modelos vao aparecer antes de aplicar.
 class _FiltrosSheet extends StatefulWidget {
   final List<Produto> produtos;
   final FiltroProdutos inicial;
+  final ScrollController? rolagem;
 
-  const _FiltrosSheet({required this.produtos, required this.inicial});
+  const _FiltrosSheet({required this.produtos, required this.inicial, this.rolagem});
 
   @override
   State<_FiltrosSheet> createState() => _FiltrosSheetState();
@@ -248,31 +287,46 @@ class _FiltrosSheetState extends State<_FiltrosSheet> {
   Set<String> _alternar(Set<String> atual, String valor) =>
       atual.contains(valor) ? ({...atual}..remove(valor)) : {...atual, valor};
 
-  Widget _secao(String titulo, List<Widget> chips) {
-    if (chips.isEmpty) return const SizedBox.shrink();
+  /// Grupo de opcoes. [multipla]: varias podem ficar marcadas (tipo, tamanho...).
+  Widget _grupo<T>(String titulo, Map<T, String> opcoes, bool Function(T) marcado, void Function(T) aoTocar) {
+    if (opcoes.isEmpty) return const SizedBox.shrink();
+    if (ehIOS(context)) {
+      return SecaoLista(cabecalho: titulo, children: [
+        for (final o in opcoes.entries)
+          CupertinoListTile(
+            title: Text(o.value),
+            trailing: marcado(o.key) ? const Icon(CupertinoIcons.check_mark) : null,
+            onTap: () => setState(() => aoTocar(o.key)),
+          ),
+      ]);
+    }
     return Padding(
-      padding: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(titulo, style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: chips),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final o in opcoes.entries)
+              FilterChip(
+                label: Text(o.value),
+                selected: marcado(o.key),
+                onSelected: (_) => setState(() => aoTocar(o.key)),
+              ),
+          ]),
         ],
       ),
     );
   }
 
-  List<Widget> _chips(List<String> opcoes, Set<String> selecionados, void Function(String) aoTocar,
-          {String prefixo = ''}) =>
-      [
-        for (final o in opcoes)
-          FilterChip(
-            label: Text('$prefixo$o'),
-            selected: selecionados.contains(o),
-            onSelected: (_) => setState(() => aoTocar(o)),
-          ),
-      ];
+  Map<String, String> _mapa(List<String> valores, {String prefixo = ''}) => {for (final v in valores) v: '$prefixo$v'};
+
+  /// Faixa de preco; a faixa inteira equivale a "sem filtro de preco".
+  void _definirFaixa(double minimo, double maximo) {
+    final inteira = minimo <= _opcoes.menorPreco && maximo >= _opcoes.maiorPreco;
+    _f = inteira ? _f.copyWith(limparPreco: true) : _f.copyWith(precoMinimo: minimo, precoMaximo: maximo);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -281,91 +335,99 @@ class _FiltrosSheetState extends State<_FiltrosSheet> {
     final minimo = (_f.precoMinimo ?? _opcoes.menorPreco).clamp(_opcoes.menorPreco, _opcoes.maiorPreco).toDouble();
     final maximo = (_f.precoMaximo ?? _opcoes.maiorPreco).clamp(minimo, _opcoes.maiorPreco).toDouble();
 
-    return DraggableScrollableSheet(
-      expand: false,
-      initialChildSize: 0.85,
-      maxChildSize: 0.95,
-      builder: (context, rolagem) => Column(
-        children: [
-          Expanded(
-            child: ListView(
-              controller: rolagem,
-              padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-              children: [
-                Text('Filtros', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-                _secao('Ordenar por', [
-                  for (final o in Ordenacao.values)
-                    ChoiceChip(
-                      label: Text(nomesOrdenacao[o]!),
-                      selected: _f.ordenacao == o,
-                      onSelected: (_) => setState(() => _f = _f.copyWith(ordenacao: o)),
-                    ),
-                ]),
-                _secao('Tipo de produto', _chips(_opcoes.categorias, _f.categorias,
-                    (o) => _f = _f.copyWith(categorias: _alternar(_f.categorias, o)))),
-                _secao('Fornecedor', _chips(_opcoes.fornecedores, _f.fornecedores,
-                    (o) => _f = _f.copyWith(fornecedores: _alternar(_f.fornecedores, o)))),
-                _secao('Tamanho', _chips(_opcoes.tamanhos, _f.tamanhos,
-                    (o) => _f = _f.copyWith(tamanhos: _alternar(_f.tamanhos, o)))),
-                _secao('Cor', _chips(_opcoes.cores, _f.cores,
-                    (o) => _f = _f.copyWith(cores: _alternar(_f.cores, o)))),
-                _secao('Disponibilidade', [
-                  for (final d in Disponibilidade.values)
-                    ChoiceChip(
-                      label: Text(nomesDisponibilidade[d]!),
-                      selected: _f.disponibilidade == d,
-                      onSelected: (_) => setState(() => _f = _f.copyWith(disponibilidade: d)),
-                    ),
-                ]),
-                if (faixa) ...[
-                  const SizedBox(height: 16),
-                  Text('Preço: ${formatarMoeda(minimo)} a ${formatarMoeda(maximo)}',
-                      style: Theme.of(context).textTheme.titleSmall),
-                  RangeSlider(
-                    min: _opcoes.menorPreco,
-                    max: _opcoes.maiorPreco,
-                    values: RangeValues(minimo, maximo),
-                    labels: RangeLabels(formatarMoeda(minimo), formatarMoeda(maximo)),
-                    onChanged: (v) => setState(() {
-                      final inteiro = v.start <= _opcoes.menorPreco && v.end >= _opcoes.maiorPreco;
-                      _f = inteiro
-                          ? _f.copyWith(limparPreco: true)
-                          : _f.copyWith(precoMinimo: v.start, precoMaximo: v.end);
-                    }),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-              child: Row(
-                children: [
-                  TextButton(
-                    onPressed: () => setState(() => _f = FiltroProdutos(ordenacao: _f.ordenacao)),
-                    child: const Text('Limpar'),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () => Navigator.of(context).pop(_f),
-                      style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-                      child: Text('Mostrar $resultado ${resultado == 1 ? 'modelo' : 'modelos'}'),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
+    return Folha(
+      titulo: 'Filtros',
+      fechar: 'Cancelar',
+      rolagem: widget.rolagem,
+      acao: BotaoTopo(rotulo: 'Limpar', aoTocar: () => setState(() => _f = FiltroProdutos(ordenacao: _f.ordenacao))),
+      rodape: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+        child: Botao.principal(
+          'Mostrar $resultado ${resultado == 1 ? 'modelo' : 'modelos'}',
+          aoTocar: () => Navigator.of(context).pop(_f),
+        ),
       ),
+      children: [
+        _grupo<Ordenacao>(
+            'Ordenar por', nomesOrdenacao, (o) => _f.ordenacao == o, (o) => _f = _f.copyWith(ordenacao: o)),
+        _grupo<String>('Tipo de produto', _mapa(_opcoes.categorias), _f.categorias.contains,
+            (o) => _f = _f.copyWith(categorias: _alternar(_f.categorias, o))),
+        _grupo<String>('Fornecedor', _mapa(_opcoes.fornecedores), _f.fornecedores.contains,
+            (o) => _f = _f.copyWith(fornecedores: _alternar(_f.fornecedores, o))),
+        _grupo<String>('Tamanho', _mapa(_opcoes.tamanhos), _f.tamanhos.contains,
+            (o) => _f = _f.copyWith(tamanhos: _alternar(_f.tamanhos, o))),
+        _grupo<String>(
+            'Cor', _mapa(_opcoes.cores), _f.cores.contains, (o) => _f = _f.copyWith(cores: _alternar(_f.cores, o))),
+        _grupo<Disponibilidade>('Disponibilidade', nomesDisponibilidade, (d) => _f.disponibilidade == d,
+            (d) => _f = _f.copyWith(disponibilidade: d)),
+        if (faixa)
+          SecaoLista(
+            cabecalho: 'Preço',
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${formatarMoeda(minimo)} a ${formatarMoeda(maximo)}'),
+                    // iPhone: o iOS nao tem controle de faixa; usa dois controles deslizantes do
+                    // iOS (minimo e maximo). Android: controle de faixa do Material.
+                    if (ehIOS(context)) ...[
+                      _LinhaPreco(
+                        rotulo: 'Mínimo',
+                        valor: minimo,
+                        min: _opcoes.menorPreco,
+                        max: _opcoes.maiorPreco,
+                        aoMudar: (v) => setState(() => _definirFaixa(v, maximo < v ? v : maximo)),
+                      ),
+                      _LinhaPreco(
+                        rotulo: 'Máximo',
+                        valor: maximo,
+                        min: _opcoes.menorPreco,
+                        max: _opcoes.maiorPreco,
+                        aoMudar: (v) => setState(() => _definirFaixa(minimo > v ? v : minimo, v)),
+                      ),
+                    ] else
+                      RangeSlider(
+                        min: _opcoes.menorPreco,
+                        max: _opcoes.maiorPreco,
+                        values: RangeValues(minimo, maximo),
+                        labels: RangeLabels(formatarMoeda(minimo), formatarMoeda(maximo)),
+                        onChanged: (v) => setState(() => _definirFaixa(v.start, v.end)),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+      ],
     );
   }
 }
 
-/// Um modelo na lista: foto, nome, tipo e fornecedor, tamanhos, preco e estoque.
+/// Controle deslizante do iOS com rotulo e valor (filtro de preco no iPhone).
+class _LinhaPreco extends StatelessWidget {
+  final String rotulo;
+  final double valor;
+  final double min;
+  final double max;
+  final ValueChanged<double> aoMudar;
+
+  const _LinhaPreco({required this.rotulo, required this.valor, required this.min, required this.max, required this.aoMudar});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        SizedBox(width: 64, child: Text(rotulo, style: estiloLegenda(context))),
+        Expanded(child: CupertinoSlider(value: valor, min: min, max: max, onChanged: aoMudar)),
+        SizedBox(width: 92, child: Text(formatarMoeda(valor), textAlign: TextAlign.end)),
+      ],
+    );
+  }
+}
+
+/// Um modelo na lista: foto (ou sigla), nome, tipo, tamanhos, estoque e preco.
 class _ModeloTile extends StatelessWidget {
   final ModeloProduto modelo;
   final VoidCallback aoTocar;
@@ -374,56 +436,41 @@ class _ModeloTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cores = Theme.of(context).colorScheme;
     final m = modelo;
-    final preco = m.menorPreco == m.maiorPreco ? formatarMoeda(m.menorPreco) : 'a partir de ${formatarMoeda(m.menorPreco)}';
-    final tamanhos = m.tamanhos.map((p) => p.tamanho).toSet().join(' · ');
-    final listaCores = m.cores.length > 1 ? ' · ${m.cores.length} cores' : '';
+    final grade = m.tamanhos.map((p) => p.tamanho).toSet().toList();
+    final tamanhos = grade.length == 1 ? grade.first : '${grade.first} a ${grade.last}';
+    final cores = m.cores.length > 1 ? ' · ${m.cores.length} cores' : '';
+    final preco = formatarMoeda(m.menorPreco);
 
     return Semantics(
-      label: '${m.nome}, $preco, tamanhos $tamanhos, ${m.estoqueTotal} peças em estoque',
+      label: '${m.nome}, ${m.menorPreco == m.maiorPreco ? preco : 'a partir de $preco'}, tamanhos $tamanhos, '
+          '${m.estoqueTotal} peças em estoque',
       excludeSemantics: true,
       button: true,
-      child: ListTile(
-        onTap: aoTocar,
-        leading: FotoProduto(produto: m.principal, tamanho: 40),
-        title: Text(m.nome),
-        subtitle: Text('${[m.categoria, m.fornecedor].whereType<String>().join(' · ')}\nTam. $tamanhos$listaCores'),
-        isThreeLine: true,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(preco, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                  '${m.estoqueTotal} peças',
-                  style: TextStyle(color: m.temEstoqueBaixo ? cores.error : null),
-                ),
-              ],
-            ),
-            const Icon(Icons.chevron_right),
-          ],
-        ),
+      child: ItemLista(
+        inicio: FotoProduto(produto: m.principal, tamanho: 40),
+        titulo: m.nome,
+        subtitulo: 'Tam. $tamanhos$cores · ${m.estoqueTotal} peças',
+        valor: preco,
+        seta: true,
+        aoTocar: aoTocar,
       ),
     );
   }
 }
 
-/// Pergunta e apaga todos os tamanhos de um modelo (somente diretoria). A API recusa os
-/// tamanhos que ja foram vendidos; o aviso diz quantos ficaram.
+/// Pergunta e apaga todos os itens de um modelo (somente diretoria). A API recusa os
+/// itens que ja foram vendidos; o aviso diz quantos ficaram.
 Future<bool> apagarModelo(BuildContext context, ModeloProduto modelo) async {
   if (modelo.tamanhos.length == 1) return apagarProduto(context, modelo.tamanhos.first);
 
-  final confirmar = await confirmarExclusao(
+  final confirmou = await confirmarExclusao(
     context,
     titulo: 'Apagar ${modelo.nome}?',
     mensagem: 'Os ${modelo.tamanhos.length} itens deste modelo (tamanhos e cores) serão removidos do catálogo. '
         'Itens que já foram vendidos não podem ser apagados.',
   );
-  if (!confirmar || !context.mounted) return false;
+  if (!confirmou || !context.mounted) return false;
 
   var apagados = 0;
   for (final p in modelo.tamanhos) {
@@ -431,7 +478,7 @@ Future<bool> apagarModelo(BuildContext context, ModeloProduto modelo) async {
       await ApiService.instancia.excluirProduto(p.idProduto);
       apagados++;
     } on ApiException {
-      // Tamanho com vendas: continua no catalogo.
+      // Item com vendas: continua no catalogo.
     }
   }
   if (context.mounted) {
@@ -448,8 +495,8 @@ Future<bool> apagarModelo(BuildContext context, ModeloProduto modelo) async {
   return apagados == modelo.tamanhos.length;
 }
 
-/// Tela do modelo: foto, dados e os tamanhos com o estoque de cada um.
-/// Gerencia e diretoria editam, dao entrada e adicionam tamanhos; a diretoria apaga.
+/// Tela do modelo: foto, dados e os itens (tamanho e cor) com o estoque de cada um.
+/// Gerencia e diretoria editam, dao entrada e adicionam itens; a diretoria apaga.
 /// Fecha devolvendo true quando algo mudou.
 class ProdutoModeloScreen extends StatefulWidget {
   final String nome;
@@ -473,40 +520,23 @@ class _ProdutoModeloScreenState extends State<ProdutoModeloScreen> {
 
   void _recarregar() {
     _alterado = true;
-    setState(() => _futuro = _carregar());
+    setState(() { _futuro = _carregar(); });
   }
 
-  Future<void> _tocarTamanho(Produto p) async {
+  Future<void> _tocarItem(Produto p) async {
     if (!ApiService.instancia.podeGerenciarEstoque) {
       await abrirFicha(context, p);
       return;
     }
 
-    final acao = await showModalBottomSheet<String>(
-      context: context,
-      useRootNavigator: true,
-      showDragHandle: true,
-      builder: (contexto) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text('Tamanho ${p.tamanho} · ${p.cor}', style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text('${p.estoque} peças em estoque'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Editar item'),
-              onTap: () => Navigator.pop(contexto, 'editar'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.add_box_outlined),
-              title: const Text('Registrar entrada de estoque'),
-              onTap: () => Navigator.pop(contexto, 'entrada'),
-            ),
-          ],
-        ),
-      ),
+    final acao = await escolherAcao<String>(
+      context,
+      titulo: 'Tamanho ${p.tamanho} · ${p.cor}',
+      mensagem: '${p.estoque} peças em estoque',
+      opcoes: const [
+        OpcaoAcao('editar', 'Editar item', Icons.edit_outlined),
+        OpcaoAcao('entrada', 'Registrar entrada de estoque', Icons.add_box_outlined),
+      ],
     );
     if (!mounted || acao == null) return;
 
@@ -536,14 +566,14 @@ class _ProdutoModeloScreenState extends State<ProdutoModeloScreen> {
       onPopInvokedWithResult: (saiu, _) {
         if (!saiu) Navigator.of(context).pop(_alterado);
       },
-      child: Scaffold(
-        appBar: AppBar(),
-        body: FutureBuilder<ModeloProduto?>(
+      child: Pagina(
+        titulo: widget.nome,
+        corpo: FutureBuilder<ModeloProduto?>(
           future: _futuro,
           builder: (context, snapshot) {
             if (snapshot.hasError) return Center(child: Text('${snapshot.error}'));
             if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: CircularProgressIndicator.adaptive());
             }
             final modelo = snapshot.data;
             if (modelo == null) {
@@ -557,148 +587,108 @@ class _ProdutoModeloScreenState extends State<ProdutoModeloScreen> {
   }
 
   Widget _conteudo(ModeloProduto m) {
-    final textos = Theme.of(context).textTheme;
-    final cores = Theme.of(context).colorScheme;
+    final ios = ehIOS(context);
     final preco = m.menorPreco == m.maiorPreco
         ? formatarMoeda(m.menorPreco)
         : '${formatarMoeda(m.menorPreco)} a ${formatarMoeda(m.maiorPreco)}';
     final disponiveis = m.tamanhos.where((p) => p.estoque > 0).length;
 
-    return RefreshIndicator(
-      onRefresh: () async {
-        setState(() => _futuro = _carregar());
+    return ListaAtualizavel(
+      aoAtualizar: () async {
+        setState(() { _futuro = _carregar(); });
         await _futuro;
       },
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-        children: [
-          Center(child: FotoProduto(produto: m.principal, tamanho: 220)),
+      padding: const EdgeInsets.only(bottom: 32),
+      children: [
+        const SizedBox(height: 8),
+        Center(child: FotoProduto(produto: m.principal, tamanho: 140)),
+        const SizedBox(height: 12),
+        Text(m.nome, textAlign: TextAlign.center, style: estiloTituloGrande(context)),
+        Text([m.categoria, m.fornecedor].whereType<String>().join(' · '),
+            textAlign: TextAlign.center, style: estiloSecundario(context)),
+        SecaoLista(children: [
+          ItemLista(titulo: 'Preço', valor: preco),
+          ItemLista(
+            titulo: 'Atacado (10% de desconto)',
+            valor: '${formatarMoeda(m.menorPreco * 0.9)}${m.menorPreco == m.maiorPreco ? '' : '+'}',
+          ),
+          if (m.descricao != null)
+            Padding(padding: const EdgeInsets.all(16), child: Text(m.descricao!, style: estiloSecundario(context))),
+        ]),
+        SecaoLista(
+          cabecalho: 'Itens',
+          rodape: '$disponiveis de ${m.tamanhos.length} com estoque · ${m.estoqueTotal} peças',
+          children: [
+            for (final p in m.tamanhos)
+              ArrastarParaApagar(
+                chave: ValueKey('item-${p.idProduto}'),
+                permitido: ApiService.instancia.podeExcluirProduto,
+                aoApagar: () => apagarProduto(context, p),
+                aoRemover: _recarregar,
+                child: _ItemTile(produto: p, mostrarPreco: m.menorPreco != m.maiorPreco, aoTocar: () => _tocarItem(p)),
+              ),
+          ],
+        ),
+        if (ApiService.instancia.podeGerenciarEstoque)
+          BotaoNovo(texto: 'Adicionar item', aoTocar: () => _adicionarItem(m)),
+        if (ApiService.instancia.podeExcluirProduto) ...[
           const SizedBox(height: 16),
-          Text(m.nome, style: textos.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-          Text([m.categoria, m.fornecedor].whereType<String>().join(' · '),
-              style: textos.bodyMedium?.copyWith(color: cores.onSurfaceVariant)),
-          const SizedBox(height: 8),
-          Text(preco, style: textos.titleLarge?.copyWith(fontWeight: FontWeight.w600)),
-          Text('Atacado (10% de desconto): ${formatarMoeda(m.menorPreco * 0.9)}${m.menorPreco == m.maiorPreco ? '' : ' em diante'}',
-              style: textos.bodySmall),
-          if (m.descricao != null) ...[
-            const SizedBox(height: 12),
-            Text(m.descricao!, style: textos.bodyLarge),
-          ],
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(child: Text('Itens', style: textos.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
-              Text('$disponiveis de ${m.tamanhos.length} com estoque · ${m.estoqueTotal} peças', style: textos.bodySmall),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Card(
-            clipBehavior: Clip.antiAlias,
-            child: Column(
-              children: [
-                for (final (i, p) in m.tamanhos.indexed) ...[
-                  if (i > 0) const Divider(height: 1, indent: 72),
-                  ArrastarParaApagar(
-                    chave: ValueKey('tamanho-${p.idProduto}'),
-                    permitido: ApiService.instancia.podeExcluirProduto,
-                    aoApagar: () => apagarProduto(context, p),
-                    aoRemover: _recarregar,
-                    child: _TamanhoTile(produto: p, mostrarPreco: m.menorPreco != m.maiorPreco, aoTocar: () => _tocarTamanho(p)),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          if (ApiService.instancia.podeGerenciarEstoque) ...[
-            const SizedBox(height: 8),
-            BotaoNovo(texto: 'Adicionar item', aoTocar: () => _adicionarItem(m)),
-          ],
-          if (ApiService.instancia.podeExcluirProduto) ...[
-            const SizedBox(height: 24),
-            BotaoApagar(
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: ios ? 0 : 16),
+            child: BotaoApagar(
               texto: m.tamanhos.length == 1 ? 'Apagar Produto' : 'Apagar Modelo (${m.tamanhos.length} itens)',
               aoTocar: () => _apagarModelo(m),
             ),
-          ],
+          ),
         ],
-      ),
+      ],
     );
   }
 }
 
-class _TamanhoTile extends StatelessWidget {
+/// Um item do modelo: o tamanho num circulo (ou a foto propria do item, ex.: outra cor),
+/// cor e situacao do estoque.
+class _ItemTile extends StatelessWidget {
   final Produto produto;
   final bool mostrarPreco;
   final VoidCallback aoTocar;
 
-  const _TamanhoTile({required this.produto, required this.mostrarPreco, required this.aoTocar});
+  const _ItemTile({required this.produto, required this.mostrarPreco, required this.aoTocar});
 
   @override
   Widget build(BuildContext context) {
-    final cores = Theme.of(context).colorScheme;
     final p = produto;
     final esgotado = p.estoque == 0;
     final baixo = !esgotado && p.estoque <= limiteEstoqueBaixo;
-    final situacao = esgotado ? 'Esgotado' : baixo ? 'Estoque baixo · ${p.estoque} peças' : '${p.estoque} peças';
+    final situacao = esgotado
+        ? 'Esgotado'
+        : baixo
+            ? 'Estoque baixo · ${p.estoque} peças'
+            : '${p.estoque} peças';
 
-    return ListTile(
-      onTap: aoTocar,
-      tileColor: cores.surface,
-      // Com foto propria (ex.: outra cor), mostra a foto do item; sem foto, o tamanho.
-      leading: p.fotoUrl != null
-          ? FotoProduto(produto: p, tamanho: 40)
-          : CircleAvatar(
-              backgroundColor: esgotado ? cores.surfaceContainerHighest : cores.primaryContainer,
-              foregroundColor: esgotado ? cores.onSurfaceVariant : cores.onPrimaryContainer,
-              child: Text(p.tamanho, style: const TextStyle(fontWeight: FontWeight.w600)),
-            ),
-      title: Text('Tamanho ${p.tamanho} · ${p.cor}'),
-      subtitle: Text(
-        situacao + (p.codigoBarras == null ? '' : '\nCódigo ${p.codigoBarras}'),
-        style: TextStyle(color: esgotado || baixo ? cores.error : null),
-      ),
-      isThreeLine: p.codigoBarras != null,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (mostrarPreco) Text(formatarMoeda(p.preco)),
-          const Icon(Icons.chevron_right),
-        ],
-      ),
+    return ItemLista(
+      inicio: p.fotoUrl != null ? FotoProduto(produto: p, tamanho: 40) : Avatar(p.tamanho, apagado: esgotado),
+      titulo: 'Tamanho ${p.tamanho} · ${p.cor}',
+      subtitulo: situacao + (p.codigoBarras == null ? '' : ' · ${p.codigoBarras}'),
+      corSubtitulo: esgotado || baixo ? corVermelha(context) : null,
+      valor: mostrarPreco ? formatarMoeda(p.preco) : null,
+      seta: true,
+      aoTocar: aoTocar,
     );
   }
 }
 
-/// Miniatura da foto do produto; sem foto (ou sem rede), mostra o tamanho da peca.
+/// Foto do produto, redonda; sem foto (ou sem rede), a sigla do produto (ex.: "CF").
 class FotoProduto extends StatelessWidget {
   final Produto produto;
   final double tamanho;
 
-  const FotoProduto({super.key, required this.produto, this.tamanho = 48});
+  const FotoProduto({super.key, required this.produto, this.tamanho = 40});
 
   @override
   Widget build(BuildContext context) {
     final endereco = produto.enderecoFoto(apiBaseUrl);
-    final cores = Theme.of(context).colorScheme;
-    // Sem foto: a sigla do produto (ex.: "CF" para Calca Flare) num circulo, como as
-    // iniciais do app Contatos. Com foto, a foto tambem fica redonda.
-    final semFoto = Container(
-      width: tamanho,
-      height: tamanho,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(color: cores.primaryContainer, shape: BoxShape.circle),
-      child: Text(
-        siglaProduto(produto.nome),
-        semanticsLabel: produto.nome,
-        style: TextStyle(
-          color: cores.onPrimaryContainer,
-          fontSize: tamanho * 0.36,
-          fontWeight: FontWeight.w600,
-          letterSpacing: -0.5,
-        ),
-      ),
-    );
+    final semFoto = Semantics(label: produto.nome, child: Avatar(siglaProduto(produto.nome), tamanho: tamanho));
     if (endereco == null) return semFoto;
 
     return ClipOval(
@@ -714,22 +704,19 @@ class FotoProduto extends StatelessWidget {
   }
 }
 
-/// Abre a ficha de um tamanho por cima da tela (inclusive da barra inferior).
+/// Abre a ficha de um item por cima da tela (inclusive da barra inferior).
 /// Devolve true quando o estoque mudou.
-Future<bool?> abrirFicha(BuildContext context, Produto produto) => showModalBottomSheet<bool>(
-      context: context,
-      useRootNavigator: true,
-      isScrollControlled: true,
-      builder: (_) => FichaProduto(produto: produto),
-    );
+Future<bool?> abrirFicha(BuildContext context, Produto produto) =>
+    abrirFolha<bool>(context, construir: (_, rolagem) => FichaProduto(produto: produto, rolagem: rolagem));
 
-/// Ficha de um tamanho (aberta pelo leitor de codigo ou pela tela do modelo). Gerencia e
+/// Ficha de um item (aberta pelo leitor de codigo ou pela tela do modelo). Gerencia e
 /// diretoria registram a entrada de mercadoria ali mesmo (a API executa a procedure
 /// sp_RegistrarEntradaEstoque). Fecha devolvendo true quando o estoque foi alterado.
 class FichaProduto extends StatefulWidget {
   final Produto produto;
+  final ScrollController? rolagem;
 
-  const FichaProduto({super.key, required this.produto});
+  const FichaProduto({super.key, required this.produto, this.rolagem});
 
   @override
   State<FichaProduto> createState() => _FichaProdutoState();
@@ -777,77 +764,48 @@ class _FichaProdutoState extends State<FichaProduto> {
   @override
   Widget build(BuildContext context) {
     final p = widget.produto;
-    final textos = Theme.of(context).textTheme;
+    final ios = ehIOS(context);
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (saiu, _) {
         if (!saiu) Navigator.of(context).pop(_alterado);
       },
-      child: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16, 16, 16, 16 + MediaQuery.of(context).viewInsets.bottom),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  FotoProduto(produto: p, tamanho: 72),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(p.nome, style: textos.titleLarge),
-                        Text('${p.categoria ?? ''} - ${p.cor} - Tam. ${p.tamanho}'),
-                        Text('Código: ${p.codigoBarras ?? '-'}', style: textos.bodySmall),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Preço'),
-                trailing: Text(formatarMoeda(p.preco), style: textos.titleMedium),
-              ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Estoque'),
-                trailing: Text('$_estoque peças', style: textos.titleMedium),
-              ),
-              if (ApiService.instancia.podeGerenciarEstoque) ...[
-                const Divider(),
-                Text('Entrada de mercadoria', style: textos.titleMedium),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _quantidade,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(labelText: 'Quantidade', border: OutlineInputBorder()),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    FilledButton.icon(
-                      onPressed: _enviando ? null : _registrarEntrada,
-                      icon: const Icon(Icons.add_box_outlined),
-                      label: const Text('Registrar'),
-                    ),
-                  ],
-                ),
+      child: Folha(
+        titulo: 'Item',
+        rolagem: widget.rolagem,
+        aoFechar: () => Navigator.of(context).pop(_alterado),
+        children: [
+          const SizedBox(height: 8),
+          Center(child: FotoProduto(produto: p, tamanho: 88)),
+          const SizedBox(height: 8),
+          Text(p.nome, textAlign: TextAlign.center, style: estiloTitulo(context)),
+          Text('Tamanho ${p.tamanho} · ${p.cor}', textAlign: TextAlign.center, style: estiloSecundario(context)),
+          SecaoLista(children: [
+            ItemLista(titulo: 'Preço', valor: formatarMoeda(p.preco)),
+            ItemLista(titulo: 'Estoque', valor: '$_estoque peças'),
+            ItemLista(titulo: 'Código de barras', valor: p.codigoBarras ?? '-'),
+            if (p.categoria != null) ItemLista(titulo: 'Tipo', valor: p.categoria),
+          ]),
+          if (ApiService.instancia.podeGerenciarEstoque) ...[
+            SecaoFormulario(
+              cabecalho: 'Entrada de mercadoria',
+              children: [
+                CampoTexto(controle: _quantidade, rotulo: 'Quantidade', teclado: TextInputType.number),
               ],
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(_alterado),
-                child: const Text('Fechar'),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: ios ? 20 : 16, vertical: 4),
+              child: Botao.principal(
+                'Registrar entrada',
+                iconeMaterial: Icons.add_box_outlined,
+                iconeIOS: CupertinoIcons.plus_rectangle_on_rectangle,
+                carregando: _enviando,
+                aoTocar: _registrarEntrada,
               ),
-            ],
-          ),
-        ),
+            ),
+          ],
+        ],
       ),
     );
   }

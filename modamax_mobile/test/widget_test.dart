@@ -1,11 +1,14 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:modamax_mobile/catalogo.dart';
 import 'package:modamax_mobile/codigo_barras.dart';
 import 'package:modamax_mobile/models.dart';
 import 'package:modamax_mobile/screens/clientes_screen.dart';
+import 'package:modamax_mobile/screens/login_screen.dart';
 import 'package:modamax_mobile/screens/produto_form_screen.dart';
 import 'package:modamax_mobile/services/api_service.dart';
+import 'package:modamax_mobile/widgets/adaptativo.dart';
 import 'package:modamax_mobile/widgets/aneis.dart';
 
 void main() {
@@ -219,5 +222,55 @@ void main() {
     expect(siglaProduto('Calca de Sarja'), 'CS');
     expect(siglaProduto('Bermuda'), 'B');
     expect(siglaProduto('  '), '?');
+  });
+
+  group('visual adaptativo', () {
+    Widget app(TargetPlatform plataforma, Widget tela) =>
+        MaterialApp(theme: ThemeData(platform: plataforma), home: tela);
+
+    testWidgets('login usa componentes da Apple no iPhone e do Material no Android', (tester) async {
+      await tester.pumpWidget(app(TargetPlatform.iOS, const LoginScreen()));
+      expect(find.byType(CupertinoPageScaffold), findsOneWidget);
+      expect(find.byType(CupertinoTextField), findsNWidgets(2));
+      expect(find.widgetWithText(CupertinoButton, 'Entrar'), findsOneWidget);
+      expect(find.byType(TextFormField), findsNothing);
+
+      await tester.pumpWidget(app(TargetPlatform.android, const LoginScreen()));
+      await tester.pumpAndSettle();
+      expect(find.byType(CupertinoPageScaffold), findsNothing);
+      expect(find.byType(TextFormField), findsNWidgets(2));
+      expect(find.widgetWithText(FilledButton, 'Entrar'), findsOneWidget);
+    });
+
+    testWidgets('pagina, lista e alerta seguem o sistema', (tester) async {
+      Widget tela() => Pagina(
+            titulo: 'Clientes',
+            tituloGrande: true,
+            corpo: Builder(
+              builder: (context) => ListView(children: [
+                SecaoLista(children: [ItemLista(titulo: 'Amanda', valor: 'R\$ 10,00', seta: true, aoTocar: () {})]),
+                Botao.principal('Apagar', aoTocar: () => confirmar(context, titulo: 'Apagar?', mensagem: 'x', acao: 'Apagar')),
+              ]),
+            ),
+          );
+
+      await tester.pumpWidget(app(TargetPlatform.iOS, tela()));
+      expect(find.byType(CupertinoNavigationBar), findsOneWidget);
+      expect(find.byType(CupertinoListSection), findsOneWidget);
+      expect(find.byType(CupertinoListTile), findsOneWidget);
+      await tester.tap(find.text('Apagar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(CupertinoAlertDialog), findsOneWidget);
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+
+      await tester.pumpWidget(app(TargetPlatform.android, tela()));
+      await tester.pumpAndSettle();
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(find.byType(ListTile), findsOneWidget);
+      await tester.tap(find.text('Apagar'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsOneWidget);
+    });
   });
 }
