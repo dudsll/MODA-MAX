@@ -378,7 +378,7 @@ class _ModeloTile extends StatelessWidget {
     final m = modelo;
     final preco = m.menorPreco == m.maiorPreco ? formatarMoeda(m.menorPreco) : 'a partir de ${formatarMoeda(m.menorPreco)}';
     final tamanhos = m.tamanhos.map((p) => p.tamanho).toSet().join(' · ');
-    final listaCores = m.cores.length > 1 ? '\n${m.cores.length} cores: ${m.cores.join(', ')}' : '';
+    final listaCores = m.cores.length > 1 ? ' · ${m.cores.length} cores' : '';
 
     return Semantics(
       label: '${m.nome}, $preco, tamanhos $tamanhos, ${m.estoqueTotal} peças em estoque',
@@ -386,19 +386,25 @@ class _ModeloTile extends StatelessWidget {
       button: true,
       child: ListTile(
         onTap: aoTocar,
-        leading: FotoProduto(produto: m.principal, tamanho: 56),
+        leading: FotoProduto(produto: m.principal, tamanho: 40),
         title: Text(m.nome),
         subtitle: Text('${[m.categoria, m.fornecedor].whereType<String>().join(' · ')}\nTam. $tamanhos$listaCores'),
         isThreeLine: true,
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(preco, style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(
-              '${m.estoqueTotal} peças',
-              style: TextStyle(color: m.temEstoqueBaixo ? cores.error : null),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(preco, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(
+                  '${m.estoqueTotal} peças',
+                  style: TextStyle(color: m.temEstoqueBaixo ? cores.error : null),
+                ),
+              ],
             ),
+            const Icon(Icons.chevron_right),
           ],
         ),
       ),
@@ -641,7 +647,7 @@ class _TamanhoTile extends StatelessWidget {
       tileColor: cores.surface,
       // Com foto propria (ex.: outra cor), mostra a foto do item; sem foto, o tamanho.
       leading: p.fotoUrl != null
-          ? FotoProduto(produto: p, tamanho: 44)
+          ? FotoProduto(produto: p, tamanho: 40)
           : CircleAvatar(
               backgroundColor: esgotado ? cores.surfaceContainerHighest : cores.primaryContainer,
               foregroundColor: esgotado ? cores.onSurfaceVariant : cores.onPrimaryContainer,
@@ -675,16 +681,13 @@ class FotoProduto extends StatelessWidget {
   Widget build(BuildContext context) {
     final endereco = produto.enderecoFoto(apiBaseUrl);
     final cores = Theme.of(context).colorScheme;
-    final grande = tamanho > 100;
-    // Sem foto: a sigla do produto (ex.: "CF" para Calca Flare), no mesmo formato da foto.
+    // Sem foto: a sigla do produto (ex.: "CF" para Calca Flare) num circulo, como as
+    // iniciais do app Contatos. Com foto, a foto tambem fica redonda.
     final semFoto = Container(
       width: tamanho,
       height: tamanho,
       alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: cores.primaryContainer,
-        borderRadius: BorderRadius.circular(grande ? tamanho / 8 : tamanho / 4),
-      ),
+      decoration: BoxDecoration(color: cores.primaryContainer, shape: BoxShape.circle),
       child: Text(
         siglaProduto(produto.nome),
         semanticsLabel: produto.nome,
@@ -698,8 +701,7 @@ class FotoProduto extends StatelessWidget {
     );
     if (endereco == null) return semFoto;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(grande ? tamanho / 8 : tamanho / 4),
+    return ClipOval(
       child: Image.network(
         endereco,
         width: tamanho,

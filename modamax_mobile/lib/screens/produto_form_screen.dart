@@ -376,7 +376,7 @@ class _Foto extends StatelessWidget {
 
     return Column(
       children: [
-        ClipRRect(borderRadius: BorderRadius.circular(24), child: imagem),
+        ClipOval(child: imagem),
         TextButton.icon(
           onPressed: aoTocar,
           icon: const Icon(Icons.photo_camera_outlined),

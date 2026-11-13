@@ -52,7 +52,13 @@ class _PedidosScreenState extends State<PedidosScreen> {
                 title: Text('Pedido #${p.idPedido} - ${p.cliente ?? ''}'),
                 subtitle: Text('${formatarData(p.dataPedido)} - ${p.status}\n${nomePagamento(p.formaPagamento)} · ${p.statusPagamento}'),
                 isThreeLine: true,
-                trailing: Text(formatarMoeda(p.valorTotal), style: const TextStyle(fontWeight: FontWeight.bold)),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(formatarMoeda(p.valorTotal), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    const Icon(Icons.chevron_right),
+                  ],
+                ),
                 onTap: () => _abrirDetalhe(p),
               ),
           ],

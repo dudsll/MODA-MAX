@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../models.dart';
@@ -81,25 +82,42 @@ class AvisoOffline extends StatelessWidget {
   }
 }
 
-class CampoBusca extends StatelessWidget {
+/// Campo de busca no padrao do iPhone (cinza, arredondado, lupa e "x" para limpar).
+/// Busca ao confirmar no teclado; limpar o campo volta a lista completa.
+class CampoBusca extends StatefulWidget {
   final String dica;
   final ValueChanged<String> aoBuscar;
 
   const CampoBusca({super.key, required this.dica, required this.aoBuscar});
 
   @override
+  State<CampoBusca> createState() => _CampoBuscaState();
+}
+
+class _CampoBuscaState extends State<CampoBusca> {
+  final _controle = TextEditingController();
+
+  @override
+  void dispose() {
+    _controle.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: TextField(
-        decoration: InputDecoration(
-          hintText: dica,
-          prefixIcon: const Icon(Icons.search),
-          border: const OutlineInputBorder(),
-          isDense: true,
-        ),
-        textInputAction: TextInputAction.search,
-        onSubmitted: aoBuscar,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: CupertinoSearchTextField(
+        controller: _controle,
+        placeholder: widget.dica,
+        onSubmitted: widget.aoBuscar,
+        onSuffixTap: () {
+          _controle.clear();
+          widget.aoBuscar('');
+        },
+        onChanged: (texto) {
+          if (texto.isEmpty) widget.aoBuscar('');
+        },
       ),
     );
   }
