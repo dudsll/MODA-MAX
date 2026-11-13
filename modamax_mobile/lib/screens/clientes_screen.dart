@@ -173,7 +173,7 @@ class _ClienteDetalheScreenState extends State<ClienteDetalheScreen> {
             Text(c.tipo == 'PJ' ? 'Pessoa jurídica' : 'Pessoa física',
                 textAlign: TextAlign.center, style: estiloSecundario(context)),
             const SizedBox(height: 12),
-            SecaoLista(children: [
+            SecaoLista(semIcones: true, children: [
               _Campo(rotulo: c.tipo == 'PJ' ? 'CNPJ' : 'CPF', valor: c.documento),
               _Campo(rotulo: 'e-mail', valor: c.email),
               if (c.telefone != null && c.telefone!.isNotEmpty) _Campo(rotulo: 'telefone', valor: c.telefone!),
@@ -195,8 +195,10 @@ class _Campo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    // Ocupa a largura toda, para o texto ficar alinhado a esquerda (e nao centralizado).
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -112,10 +112,11 @@ class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
           children: [
             SecaoLista(
               rodape: 'Envie este código ao cliente; ele cola no app do banco para pagar.',
+              semIcones: true,
               children: [
                 ItemLista(titulo: 'Valor', valor: formatarMoeda(widget.pedido.valorTotal)),
                 Padding(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.fromLTRB(20, 14, 16, 14),
                   child: SelectableText(codigo, style: const TextStyle(fontFamily: 'Menlo', fontSize: 12)),
                 ),
               ],

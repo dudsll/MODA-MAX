@@ -240,6 +240,11 @@ class IndicadorMeta {
 
   IndicadorMeta({required this.meta, required this.realizado, required this.percentual});
 
+  /// Percentual para exibir, arredondado para baixo: R$ 6.784 de R$ 6.800 mostra 99%, e nao
+  /// 100% (que daria a impressao de meta batida).
+  int get percentualExibido =>
+      meta <= 0 ? percentual : (realizado * 100 / meta + 1e-9).floor();
+
   factory IndicadorMeta.fromJson(Map<String, dynamic> json) => IndicadorMeta(
         meta: _decimal(json['meta']),
         realizado: _decimal(json['realizado']),

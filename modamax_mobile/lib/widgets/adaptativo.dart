@@ -188,7 +188,17 @@ class SecaoLista extends StatelessWidget {
   final String? rodape;
   final List<Widget> children;
 
-  const SecaoLista({super.key, this.cabecalho, this.rodape, required this.children});
+  /// Linhas sem icone a esquerda: a divisoria comeca junto do texto (como na ficha do Contatos).
+  final bool semIcones;
+
+  const SecaoLista({super.key, this.cabecalho, this.rodape, required this.children, this.semIcones = false});
+
+  /// Sem icone a esquerda em nenhuma linha: a divisoria comeca junto do texto, como nos
+  /// Ajustes do iPhone (o padrao do Flutter deixa o recuo de um icone que nao existe).
+  bool get _semIcones =>
+      semIcones ||
+      children.every((w) =>
+          (w is ItemLista && w.inicio == null) || (w is CupertinoListTile && w.leading == null));
 
   @override
   Widget build(BuildContext context) {
@@ -198,6 +208,8 @@ class SecaoLista extends StatelessWidget {
         header: cabecalho == null ? null : _textoSecao(context, cabecalho!),
         footer: rodape == null ? null : _textoSecao(context, rodape!, cabecalho: false),
         backgroundColor: fundoAgrupado(context),
+        dividerMargin: _semIcones ? 20 : 14,
+        additionalDividerMargin: _semIcones ? 0 : null,
         children: children,
       );
     }
