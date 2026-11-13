@@ -161,8 +161,10 @@ class FiltroProdutos {
         return true;
       case Disponibilidade.emEstoque:
         return p.estoque > 0;
+      // Inclui os esgotados: e a mesma regra do indicador "Estoque baixo" do painel (itens que
+      // precisam de reposicao), que conta tambem os que zeraram.
       case Disponibilidade.estoqueBaixo:
-        return p.estoque > 0 && p.estoque <= limiteEstoqueBaixo;
+        return p.estoque <= limiteEstoqueBaixo;
       case Disponibilidade.esgotado:
         return p.estoque == 0;
     }

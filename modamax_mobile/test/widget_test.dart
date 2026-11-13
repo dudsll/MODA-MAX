@@ -124,7 +124,7 @@ void main() {
 
     expect(find.text('67%'), findsOneWidget);
     expect(find.text('64%'), findsOneWidget);
-    expect(find.text('69%'), findsOneWidget);
+    expect(find.text('68%'), findsOneWidget);
     expect(find.text('Peças'), findsOneWidget);
   });
 
@@ -188,6 +188,8 @@ void main() {
           'Calca Flare de Lantejoulas');
       final baixo = const FiltroProdutos(disponibilidade: Disponibilidade.estoqueBaixo).aplicar(produtos);
       expect(baixo.map((m) => m.nome), ['Calca Flare de Lantejoulas', 'Jaqueta Jeans']);
+      // Esgotado tambem precisa de reposicao (mesma regra do indicador do painel).
+      expect(baixo.first.tamanhos.map((t) => t.tamanho), ['36', '40']);
       expect(const FiltroProdutos(precoMaximo: 90).aplicar(produtos).single.nome, 'Bermuda');
       expect(const FiltroProdutos(categorias: {'Jaqueta'}, tamanhos: {'G'}).aplicar(produtos), isEmpty);
     });
@@ -272,5 +274,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byType(AlertDialog), findsOneWidget);
     });
+  });
+
+  test('percentual da meta arredonda para baixo (99,8% nao aparece como meta batida)', () {
+    expect(IndicadorMeta(meta: 6800, realizado: 6784.87, percentual: 100).percentualExibido, 99);
+    expect(IndicadorMeta(meta: 12, realizado: 13, percentual: 108).percentualExibido, 108);
+    expect(IndicadorMeta(meta: 49, realizado: 49, percentual: 100).percentualExibido, 100);
+    expect(IndicadorMeta(meta: 0, realizado: 5, percentual: 0).percentualExibido, 0);
   });
 }

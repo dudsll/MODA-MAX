@@ -23,7 +23,7 @@ class AneisMeta extends StatelessWidget {
     ];
 
     return Semantics(
-      label: 'Metas de ${meta.mes}: ${itens.map((i) => '${i.$1} ${i.$2.percentual}%').join(', ')}',
+      label: 'Metas de ${meta.mes}: ${itens.map((i) => '${i.$1} ${i.$2.percentualExibido}%').join(', ')}',
       excludeSemantics: true,
       child: Row(
         children: [
@@ -31,7 +31,7 @@ class AneisMeta extends StatelessWidget {
             width: 128,
             height: 128,
             child: CustomPaint(
-              painter: _PintorAneis([for (final i in itens) i.$2.percentual / 100]),
+              painter: _PintorAneis([for (final i in itens) i.$2.percentualExibido / 100]),
             ),
           ),
           const SizedBox(width: 20),
@@ -55,7 +55,7 @@ class AneisMeta extends StatelessWidget {
                             ],
                           ),
                         ),
-                        Text('${itens[n].$2.percentual}%', style: estiloSubtitulo(context).copyWith(fontWeight: FontWeight.w700)),
+                        Text('${itens[n].$2.percentualExibido}%', style: estiloSubtitulo(context).copyWith(fontWeight: FontWeight.w700)),
                       ],
                     ),
                   ),
