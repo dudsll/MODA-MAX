@@ -269,20 +269,23 @@ class ItemLista extends StatelessWidget {
         onTap: aoTocar,
       );
     }
+    // No Android (Material 3) a linha inteira e tocavel e nao leva a seta ">" do iOS; o valor
+    // a direita e texto de apoio, no tamanho do corpo.
+    final textos = Theme.of(context).textTheme;
+    final cores = Theme.of(context).colorScheme;
     return ListTile(
       leading: inicio,
       title: Text(titulo, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: subtitulo == null
           ? null
           : Text(subtitulo!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: corSubtitulo)),
-      trailing: (valor == null && !seta && fim == null)
+      trailing: (valor == null && fim == null)
           ? null
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (valor != null) Text(valor!, style: const TextStyle(fontWeight: FontWeight.w600)),
+                if (valor != null) Text(valor!, style: textos.bodyMedium?.copyWith(color: cores.onSurfaceVariant)),
                 if (fim != null) fim!,
-                if (seta && fim == null) const Icon(Icons.chevron_right),
               ],
             ),
       onTap: aoTocar,
@@ -307,12 +310,12 @@ class Avatar extends StatelessWidget {
         ? (apagado
             ? CupertinoColors.systemGrey5.resolveFrom(context)
             : CupertinoColors.systemBlue.resolveFrom(context).withValues(alpha: 0.15))
-        : (apagado ? cores.surfaceContainerHighest : cores.primaryContainer);
+        : (apagado ? cores.surfaceContainerHighest : cores.secondaryContainer);
     final frente = ios
         ? (apagado
             ? CupertinoColors.secondaryLabel.resolveFrom(context)
             : CupertinoColors.systemBlue.resolveFrom(context))
-        : (apagado ? cores.onSurfaceVariant : cores.onPrimaryContainer);
+        : (apagado ? cores.onSurfaceVariant : cores.onSecondaryContainer);
     return Container(
       width: tamanho,
       height: tamanho,

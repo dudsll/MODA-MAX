@@ -314,8 +314,11 @@ class _Cartao extends StatelessWidget {
       margin: EdgeInsets.fromLTRB(ios ? 20 : 16, 8, ios ? 20 : 16, 8),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: ios ? CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context) : Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(ios ? 10 : 16),
+        // No Android, cartao "preenchido" do Material 3: um tom acima do fundo da tela.
+        color: ios
+            ? CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(ios ? 10 : 12),
       ),
       child: child,
     );

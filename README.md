@@ -185,7 +185,28 @@ dotnet run --project modamax.web/modamax.web.csproj --launch-profile sqlite --ur
 
 5. Na primeira vez, confie no seu perfil em **Ajustes > Geral > VPN e Gerenciamento de Dispositivo** e permita o acesso à rede local quando o app pedir.
 
-O script compila uma cópia em `~/Developer/ModaMax-mobile`: pastas sincronizadas com o iCloud (como Documentos) deixam atributos nos arquivos que impedem o Xcode de assinar o app. O Team da conta Apple é gravado só nessa cópia, nunca no repositório.
+O script compila uma cópia em `~/Developer/ModaMax-mobile`: pastas sincronizadas com o iCloud (como Documentos) deixam atributos nos arquivos que impedem o Xcode de assinar o app. O Team da conta Apple é gravado só nessa cópia, nunca no repositório. Depois do primeiro pareamento pelo cabo, o script também instala pelo Wi-Fi, com o iPhone desbloqueado e na mesma rede do Mac. O endereço da API entra no app na compilação: se o Mac mudar de rede (e de IP), rode o script de novo.
+
+#### No Android
+
+1. Instale o Java e o SDK do Android (uma vez):
+
+```bash
+brew install openjdk@21
+brew install --cask android-commandlinetools
+sdkmanager --sdk_root=$HOME/Library/Android/sdk "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+flutter config --android-sdk $HOME/Library/Android/sdk --jdk-dir /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+```
+
+2. Suba a API aceitando conexões da rede (mesmo comando do iPhone).
+3. No celular, ative as **Opções do desenvolvedor** (**Configurações > Sobre o telefone**, toque 7 vezes em **Número da versão**) e, nelas, a **Depuração USB**. Ligue o cabo e aceite **Permitir depuração USB?**.
+4. Rode o script, que gera o APK com o IP do Mac, deixa uma cópia em `~/Desktop/ModaMax.apk` e instala no celular conectado:
+
+```bash
+./modamax_mobile/preparar_android.sh
+```
+
+Sem cabo, envie o `ModaMax.apk` para o celular, abra o arquivo e permita a instalação de apps desta fonte.
 
 ## Banco de dados
 
