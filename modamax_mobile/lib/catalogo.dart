@@ -1,3 +1,4 @@
+import 'busca.dart';
 import 'models.dart';
 
 /// Na API cada tamanho e um produto proprio (tem codigo de barras e estoque proprios).
@@ -23,6 +24,9 @@ class ModeloProduto {
 }
 
 const limiteEstoqueBaixo = 15;
+
+/// Onde a busca de produtos procura: nome, tipo, cor, fornecedor, tamanho e codigo de barras.
+List<String?> camposDeBusca(Produto p) => [p.nome, p.categoria, p.cor, p.fornecedor, p.tamanho, p.codigoBarras];
 
 const _palavrasDeLigacao = {'de', 'da', 'do', 'das', 'dos', 'e', 'com', 'em', 'para', 'a', 'o'};
 
@@ -170,12 +174,26 @@ class FiltroProdutos {
     }
   }
 
-  /// Aplica os filtros, agrupa por modelo e ordena.
-  List<ModeloProduto> aplicar(Iterable<Produto> produtos) {
-    final modelos = agruparPorModelo(produtos.where(atende));
+  /// Aplica a busca e os filtros, agrupa por modelo e ordena. Com busca e ordenacao por nome,
+  /// os modelos mais parecidos com o que foi digitado vem primeiro.
+  List<ModeloProduto> aplicar(Iterable<Produto> produtos, {String? busca}) {
+    final pontos = <int, double>{};
+    for (final p in produtos.where(atende)) {
+      final ponto = pontuarBusca(busca ?? '', camposDeBusca(p));
+      if (ponto != null) pontos[p.idProduto] = ponto;
+    }
+    final modelos = agruparPorModelo(produtos.where((p) => pontos.containsKey(p.idProduto)));
     switch (ordenacao) {
       case Ordenacao.nome:
-        break;
+        double melhor(ModeloProduto m) => m.tamanhos.map((p) => pontos[p.idProduto]!).reduce((a, b) => a > b ? a : b);
+        if (busca != null && busca.trim().isNotEmpty) {
+          // sort estavel: empates continuam em ordem alfabetica
+          final ordem = {for (var i = 0; i < modelos.length; i++) modelos[i]: i};
+          modelos.sort((a, b) {
+            final c = melhor(b).compareTo(melhor(a));
+            return c != 0 ? c : ordem[a]!.compareTo(ordem[b]!);
+          });
+        }
       case Ordenacao.menorPreco:
         modelos.sort((a, b) => a.menorPreco.compareTo(b.menorPreco));
       case Ordenacao.maiorPreco:

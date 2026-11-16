@@ -37,9 +37,10 @@ void main() {
     await t.tocar(find.text('Limpar'));
     await t.esperar(find.text('12 modelos · Nome'));
 
-    // ---- Busca
-    await t.digitar(find.byType(CupertinoSearchTextField), 'Skinny', confirmar: true);
+    // ---- Busca: minusculas e erro de digitacao ("calsa skiny") acham a "Calca Skinny"
+    await t.digitar(find.byType(CupertinoSearchTextField), 'calsa skiny');
     await t.esperar(find.text('1 modelo · Nome'));
+    expect(find.text('Calca Skinny'), findsOneWidget);
     // Limpar pelo "x" do campo (como o usuario faz) volta a lista completa.
     await t.tocar(find.byIcon(CupertinoIcons.xmark_circle_fill));
     await t.esperar(find.text('12 modelos · Nome'));

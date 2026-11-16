@@ -36,8 +36,11 @@ public class ProdutosApiController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(busca))
         {
+            // LIKE sem diferenca de maiusculas: "calca" acha "Calca" tambem no SQLite (Contains vira
+            // instr(), que diferencia). A busca tolerante a erros de digitacao fica no app.
             var codigo = busca.Trim();
-            query = query.Where(p => p.Nome.Contains(busca) || p.CodigoBarras == codigo);
+            var padrao = BuscaSql.Contem(codigo);
+            query = query.Where(p => EF.Functions.Like(p.Nome, padrao, BuscaSql.Escape) || p.CodigoBarras == codigo);
         }
 
         if (categoriaId.HasValue)

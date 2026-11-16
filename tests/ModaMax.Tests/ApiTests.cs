@@ -86,6 +86,29 @@ public class ApiTests : IClassFixture<ModaMaxFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, resposta.StatusCode);
     }
 
+    [Theory]
+    [InlineData("jeans")]
+    [InlineData("JEANS")]
+    [InlineData("JeAnS")]
+    public async Task Busca_de_produtos_e_clientes_ignora_maiusculas(string termo)
+    {
+        var cliente = await ClienteLogadoAsync("operacional@modamax.com");
+        var produtos = await cliente.GetFromJsonAsync<JsonElement[]>($"/api/produtos?busca={termo}", Json);
+        Assert.NotEmpty(produtos!);
+        Assert.All(produtos!, p => Assert.Contains("jeans", p.GetProperty("nome").GetString()!, StringComparison.OrdinalIgnoreCase));
+
+        var clientes = await cliente.GetFromJsonAsync<JsonElement[]>("/api/clientes?busca=AMANDA", Json);
+        Assert.Contains(clientes!, c => c.GetProperty("nome").GetString() == "Amanda da Silva");
+    }
+
+    [Fact]
+    public async Task Busca_trata_caracteres_do_like_como_texto()
+    {
+        var cliente = await ClienteLogadoAsync("operacional@modamax.com");
+        var produtos = await cliente.GetFromJsonAsync<JsonElement[]>("/api/produtos?busca=%25", Json);
+        Assert.Empty(produtos!); // "%" nao vira curinga que traz tudo
+    }
+
     [Fact]
     public async Task Criar_pedido_pela_api_baixa_o_estoque()
     {

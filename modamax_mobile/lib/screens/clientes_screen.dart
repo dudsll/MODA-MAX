@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../busca.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../widgets/comum.dart';
@@ -42,7 +43,8 @@ class _ClientesScreenState extends State<ClientesScreen> {
   Future<void> _atualizar() async {
     setState(() {
       _apagados.clear();
-      _futuro = ApiService.instancia.clientes(busca: _busca);
+      // Lista completa da API; a busca e feita no app (ver busca.dart).
+      _futuro = ApiService.instancia.clientes();
     });
     await _futuro;
   }
@@ -67,22 +69,28 @@ class _ClientesScreenState extends State<ClientesScreen> {
       futuro: _futuro,
       aoAtualizar: _atualizar,
       construir: (dados) {
-        final clientes = dados.valor.where((c) => !_apagados.contains(c.idCliente)).toList();
+        final clientes = buscar(
+          _busca,
+          dados.valor.where((c) => !_apagados.contains(c.idCliente)),
+          (c) => [c.nome, c.documento, c.email, c.telefone],
+        );
+        final buscando = _busca != null && _busca!.trim().isNotEmpty;
         return ListaAtualizavel(
           aoAtualizar: _atualizar,
           children: [
             CampoBusca(
-              dica: 'Buscar por nome ou documento',
+              dica: 'Buscar por nome, documento ou e-mail',
               texto: _busca,
-              aoBuscar: (texto) {
-                _busca = texto;
-                _atualizar();
-              },
+              aoBuscar: (texto) => setState(() => _busca = texto),
             ),
             BotaoNovo(texto: 'Novo cliente', aoTocar: dados.doCache ? null : _novoCliente),
             if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
             if (clientes.isEmpty)
-              const SecaoLista(children: [ItemLista(titulo: 'Nenhum cliente encontrado.')]),
+              SecaoLista(children: [
+                ItemLista(
+                  titulo: buscando ? 'Nenhum cliente parecido com "${_busca!.trim()}".' : 'Nenhum cliente encontrado.',
+                ),
+              ]),
             SecaoLista(
               rodape: clientes.isEmpty ? null : '${clientes.length} ${clientes.length == 1 ? 'cliente' : 'clientes'}',
               children: [
