@@ -28,7 +28,9 @@ class ProdutosScreenState extends State<ProdutosScreen> {
   Future<void> _atualizar() async {
     setState(() {
       _apagados.clear();
-      _futuro = ApiService.instancia.produtos(busca: _busca);
+      // A lista completa vem da API e a busca e feita no proprio app (ver busca.dart): mais
+      // rapida, funciona sem internet e tolera erros de digitacao.
+      _futuro = ApiService.instancia.produtos();
     });
     await _futuro;
   }
@@ -85,17 +87,15 @@ class ProdutosScreenState extends State<ProdutosScreen> {
       aoAtualizar: _atualizar,
       construir: (dados) {
         final produtos = dados.valor.where((p) => !_apagados.contains(p.idProduto)).toList();
-        final modelos = _filtro.aplicar(produtos);
+        final modelos = _filtro.aplicar(produtos, busca: _busca);
+        final buscando = _busca != null && _busca!.trim().isNotEmpty;
         return ListaAtualizavel(
           aoAtualizar: _atualizar,
           children: [
             CampoBusca(
               dica: 'Buscar produto ou código',
               texto: _busca,
-              aoBuscar: (texto) {
-                _busca = texto;
-                _atualizar();
-              },
+              aoBuscar: (texto) => setState(() => _busca = texto),
             ),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: ehIOS(context) ? 20 : 16),
@@ -132,9 +132,15 @@ class ProdutosScreenState extends State<ProdutosScreen> {
             if (dados.doCache) AvisoOffline(sincronizadoEm: dados.sincronizadoEm),
             if (modelos.isEmpty)
               SecaoLista(
-                rodape: _filtro.vazio ? null : 'Toque em Filtros para mudar a seleção.',
+                rodape: !_filtro.vazio
+                    ? 'Toque em Filtros para mudar a seleção.'
+                    : (buscando ? 'Busque pelo nome, tipo, cor, tamanho ou código de barras.' : null),
                 children: [
-                  ItemLista(titulo: _filtro.vazio ? 'Nenhum produto encontrado.' : 'Nenhum produto com esses filtros.'),
+                  ItemLista(
+                    titulo: !_filtro.vazio
+                        ? 'Nenhum produto com esses filtros.'
+                        : (buscando ? 'Nenhum produto parecido com "${_busca!.trim()}".' : 'Nenhum produto encontrado.'),
+                  ),
                 ],
               ),
             SecaoLista(

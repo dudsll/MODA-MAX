@@ -1,6 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../busca.dart';
+import '../catalogo.dart';
 import '../models.dart';
 import '../services/api_service.dart';
 import '../widgets/comum.dart';
@@ -43,15 +45,8 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
         titulo: 'Escolha o produto',
         rolagem: rolagem,
         children: [
-          SecaoLista(children: [
-            for (final p in produtos)
-              ItemLista(
-                titulo: p.nome,
-                subtitulo: 'Tam. ${p.tamanho} · ${p.cor} · ${p.estoque} em estoque',
-                valor: formatarMoeda(p.preco),
-                aoTocar: () => Navigator.of(folha).pop(p),
-              ),
-          ]),
+          // Busca dentro da folha, com a mesma tolerancia da lista de produtos.
+          _EscolhaProduto(produtos: produtos, aoEscolher: (p) => Navigator.of(folha).pop(p)),
         ],
       ),
     );
@@ -237,6 +232,46 @@ class _NovoPedidoScreenState extends State<NovoPedidoScreen> {
           );
         },
       ),
+    );
+  }
+}
+
+/// Lista de produtos da folha "Escolha o produto", com campo de busca.
+class _EscolhaProduto extends StatefulWidget {
+  final List<Produto> produtos;
+  final ValueChanged<Produto> aoEscolher;
+
+  const _EscolhaProduto({required this.produtos, required this.aoEscolher});
+
+  @override
+  State<_EscolhaProduto> createState() => _EscolhaProdutoState();
+}
+
+class _EscolhaProdutoState extends State<_EscolhaProduto> {
+  String _busca = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final lista = buscar(_busca, widget.produtos, camposDeBusca);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        CampoBusca(
+          dica: 'Buscar produto, cor, tamanho ou código',
+          texto: _busca,
+          aoBuscar: (texto) => setState(() => _busca = texto),
+        ),
+        SecaoLista(children: [
+          if (lista.isEmpty) ItemLista(titulo: 'Nenhum produto parecido com "${_busca.trim()}".'),
+          for (final p in lista)
+            ItemLista(
+              titulo: p.nome,
+              subtitulo: 'Tam. ${p.tamanho} · ${p.cor} · ${p.estoque} em estoque',
+              valor: formatarMoeda(p.preco),
+              aoTocar: () => widget.aoEscolher(p),
+            ),
+        ]),
+      ],
     );
   }
 }

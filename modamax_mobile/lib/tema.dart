@@ -1,14 +1,48 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
-/// Tema do app no estilo iOS: fundo agrupado cinza-claro (ou preto no escuro), cartoes brancos
-/// arredondados, titulos fortes e o azul jeans da marca como destaque. Mesmo visual da Web.
+/// Azul jeans da marca, o mesmo da Web.
+const _azul = Color(0xFF0071E3);
+
+/// Tema do app. No iPhone, as telas usam os componentes Cupertino e este tema so completa o
+/// que eles nao cobrem (fundo agrupado cinza-claro, cartoes brancos, como na Web). No Android,
+/// e o Material 3 padrao do Google, com as cores geradas a partir do azul da marca.
 ThemeData temaModaMax(Brightness brilho) {
-  final escuro = brilho == Brightness.dark;
-  const azul = Color(0xFF0071E3);
+  final ios = defaultTargetPlatform == TargetPlatform.iOS || defaultTargetPlatform == TargetPlatform.macOS;
+  return ios ? _temaIOS(brilho) : _temaAndroid(brilho);
+}
+
+ThemeData _temaAndroid(Brightness brilho) {
+  // "fidelity" mantem o azul da marca no botao principal (o padrao do Material 3 o deixaria
+  // acinzentado); os demais tons continuam gerados pelo sistema.
   final esquema = ColorScheme.fromSeed(
-    seedColor: azul,
+    seedColor: _azul,
     brightness: brilho,
-    primary: escuro ? const Color(0xFF0A84FF) : azul,
+    dynamicSchemeVariant: DynamicSchemeVariant.fidelity,
+  );
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: esquema,
+    // Alvos de toque maiores ajudam usuarios com dificuldade motora.
+    materialTapTargetSize: MaterialTapTargetSize.padded,
+    // Campos com contorno e rotulo que sobe ao digitar (padrao do Material 3).
+    inputDecorationTheme: const InputDecorationTheme(border: OutlineInputBorder()),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(minimumSize: const Size(0, 48)),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(minimumSize: const Size(0, 44)),
+    ),
+    snackBarTheme: const SnackBarThemeData(behavior: SnackBarBehavior.floating),
+  );
+}
+
+ThemeData _temaIOS(Brightness brilho) {
+  final escuro = brilho == Brightness.dark;
+  final esquema = ColorScheme.fromSeed(
+    seedColor: _azul,
+    brightness: brilho,
+    primary: escuro ? const Color(0xFF0A84FF) : _azul,
     surface: escuro ? const Color(0xFF1C1C1E) : Colors.white,
   );
   final fundo = escuro ? Colors.black : const Color(0xFFF2F2F7);

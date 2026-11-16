@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using ModaMax.Web.Data;
 using modamax.web.Dtos;
 using modamax.web.Models;
+using modamax.web.Services;
 
 namespace modamax.web.Controllers.Api;
 
@@ -27,7 +28,9 @@ public class ClientesApiController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(busca))
         {
-            query = query.Where(c => c.Nome.Contains(busca) || c.Documento.Contains(busca));
+            var padrao = BuscaSql.Contem(busca.Trim());
+            query = query.Where(c => EF.Functions.Like(c.Nome, padrao, BuscaSql.Escape)
+                || EF.Functions.Like(c.Documento, padrao, BuscaSql.Escape));
         }
 
         var clientes = await query.OrderBy(c => c.Nome).ToListAsync();

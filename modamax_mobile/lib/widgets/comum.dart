@@ -86,13 +86,13 @@ class AvisoOffline extends StatelessWidget {
 }
 
 /// Campo de busca no padrao do iPhone (cinza, arredondado, lupa e "x" para limpar).
-/// Busca ao confirmar no teclado; limpar o campo volta a lista completa.
+/// Busca enquanto digita (a filtragem e feita no app, ver busca.dart); limpar o campo volta a
+/// lista completa.
 class CampoBusca extends StatefulWidget {
   final String dica;
   final ValueChanged<String> aoBuscar;
 
-  /// Busca atual: a lista recarrega a cada busca e o campo e recriado; sem isto ele voltaria
-  /// vazio com a lista ainda filtrada.
+  /// Busca atual, para o campo nao voltar vazio se a tela for recriada (ex.: ao atualizar).
   final String? texto;
 
   const CampoBusca({super.key, required this.dica, required this.aoBuscar, this.texto});
@@ -122,17 +122,20 @@ class _CampoBuscaState extends State<CampoBusca> {
           elevation: const WidgetStatePropertyAll(0),
           onSubmitted: widget.aoBuscar,
           onChanged: (texto) {
-            if (texto.isEmpty) widget.aoBuscar('');
+            widget.aoBuscar(texto); // busca enquanto digita
+            setState(() {}); // mostra ou esconde o "x"
           },
+          // O "x" so aparece quando ha texto, como no padrao do Android.
           trailing: [
-            IconButton(
-              tooltip: 'Limpar busca',
-              icon: const Icon(Icons.close),
-              onPressed: () {
-                _controle.clear();
-                widget.aoBuscar('');
-              },
-            ),
+            if (_controle.text.isNotEmpty)
+              IconButton(
+                tooltip: 'Limpar busca',
+                icon: const Icon(Icons.close),
+                onPressed: () {
+                  setState(_controle.clear);
+                  widget.aoBuscar('');
+                },
+              ),
           ],
         ),
       );
@@ -147,9 +150,7 @@ class _CampoBuscaState extends State<CampoBusca> {
           _controle.clear();
           widget.aoBuscar('');
         },
-        onChanged: (texto) {
-          if (texto.isEmpty) widget.aoBuscar('');
-        },
+        onChanged: widget.aoBuscar, // busca enquanto digita
       ),
     );
   }

@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Acesso a API. O Flutter so coloca essa permissao nas versoes de teste (debug/profile):
+         sem ela, o APK final nao conecta e mostra "sem conexao" em todas as telas. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- A camera (leitor de codigo e foto do produto) e opcional: o app instala tambem em
+         aparelhos sem camera, e o codigo pode ser digitado. A permissao vem do mobile_scanner. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <application
         android:label="ModaMax"
         android:usesCleartextTraffic="true"
