@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
@@ -51,6 +52,14 @@ ThemeData _temaIOS(Brightness brilho) {
     useMaterial3: true,
     colorScheme: esquema,
     scaffoldBackgroundColor: fundo,
+    // Cores do iOS fixadas para cada modo: derivadas do tema Material, a barra de topo ficava
+    // clara no modo escuro ao rolar a tela, e o texto dos botoes azuis ficava escuro.
+    cupertinoOverrideTheme: CupertinoThemeData(
+      brightness: brilho,
+      primaryColor: escuro ? const Color(0xFF0A84FF) : _azul,
+      primaryContrastingColor: CupertinoColors.white,
+      barBackgroundColor: escuro ? const Color(0xF01D1D1D) : const Color(0xF0F9F9F9),
+    ),
     // Alvos de toque maiores ajudam usuarios com dificuldade motora.
     materialTapTargetSize: MaterialTapTargetSize.padded,
     appBarTheme: AppBarTheme(
