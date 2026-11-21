@@ -63,6 +63,58 @@ public class MetaService
             diasNoMes, diasDecorridos, projecao);
     }
 
+    /// <summary>
+    /// Progresso de um mes qualquer: o atual (ate hoje, com projecao), um ja encerrado (mes
+    /// inteiro, projecao = realizado) ou um futuro (nada realizado ainda).
+    /// </summary>
+    public async Task<ProgressoMeta> ProgressoDoMesAsync(int ano, int mes, DateTime? referencia = null)
+    {
+        var hoje = (referencia ?? DateTime.Today).Date;
+        var inicio = new DateTime(ano, mes, 1);
+        var inicioAtual = new DateTime(hoje.Year, hoje.Month, 1);
+        if (inicio == inicioAtual) return await ProgressoAsync(hoje);
+        if (inicio < inicioAtual) return await ProgressoAsync(inicio.AddMonths(1).AddDays(-1));
+
+        var meta = await ObterOuSugerirAsync(ano, mes);
+        return new ProgressoMeta(ano, mes, NomeMes(ano, mes), meta.IdMeta > 0,
+            new IndicadorMeta(meta.Faturamento, 0), new IndicadorMeta(meta.Pedidos, 0), new IndicadorMeta(meta.Pecas, 0),
+            DateTime.DaysInMonth(ano, mes), 0, 0);
+    }
+
+    /// <summary>Faturamento, pedidos e pecas realizados entre duas datas (sem cancelados).</summary>
+    public Task<(decimal Faturamento, int Pedidos, int Pecas)> RealizadoNoPeriodoAsync(DateTime inicio, DateTime fimExclusivo) =>
+        RealizadoAsync(inicio, fimExclusivo);
+
+    /// <summary>Faturamento de cada dia do mes (para o grafico).</summary>
+    public async Task<List<(int Dia, decimal Valor)>> FaturamentoPorDiaAsync(int ano, int mes)
+    {
+        var inicio = new DateTime(ano, mes, 1);
+        var pedidos = await _context.Pedidos.AsNoTracking()
+            .Where(p => p.Status != PedidoService.StatusCancelado && p.DataPedido >= inicio && p.DataPedido < inicio.AddMonths(1))
+            .Select(p => new { p.DataPedido, p.ValorTotal })
+            .ToListAsync();
+        var porDia = pedidos.GroupBy(p => p.DataPedido.Day).ToDictionary(g => g.Key, g => g.Sum(p => p.ValorTotal));
+        return Enumerable.Range(1, DateTime.DaysInMonth(ano, mes))
+            .Select(d => (d, porDia.TryGetValue(d, out var v) ? v : 0m))
+            .ToList();
+    }
+
+    /// <summary>Produtos mais vendidos do mes, por pecas (sem cancelados).</summary>
+    public async Task<List<(string Produto, int Pecas, decimal Valor)>> MaisVendidosDoMesAsync(int ano, int mes, int quantos = 5)
+    {
+        var inicio = new DateTime(ano, mes, 1);
+        var itens = await _context.Pedidos.AsNoTracking()
+            .Where(p => p.Status != PedidoService.StatusCancelado && p.DataPedido >= inicio && p.DataPedido < inicio.AddMonths(1))
+            .SelectMany(p => p.Itens)
+            .Select(i => new { Produto = i.Produto!.Nome, i.Quantidade, i.PrecoUnitario, i.Desconto })
+            .ToListAsync();   // contas feitas aqui: o SQLite nao calcula decimal no banco
+        return itens.GroupBy(i => i.Produto)
+            .Select(g => (g.Key, g.Sum(i => i.Quantidade), g.Sum(i => i.PrecoUnitario * i.Quantidade - i.Desconto)))
+            .OrderByDescending(x => x.Item2).ThenBy(x => x.Key)
+            .Take(quantos)
+            .ToList();
+    }
+
     // Ultimos meses fechados, para o historico de metas.
     public async Task<List<ProgressoMeta>> HistoricoAsync(int meses = 6, DateTime? referencia = null)
     {

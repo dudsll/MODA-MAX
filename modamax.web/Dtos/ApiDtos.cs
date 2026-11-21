@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using modamax.web.Services;
 
 namespace modamax.web.Dtos;
 
@@ -136,6 +137,38 @@ public record MetaDto(
     decimal ProjecaoFaturamento,
     int DiasRestantes);
 
+/// <summary>Detalhes de um mes para a tela de metas do app.</summary>
+public record MetaMesDto(
+    int Ano,
+    int Mes,
+    string NomeMes,
+    string Situacao,               // "atual", "encerrado" ou "futuro"
+    bool Definida,
+    IndicadorMetaDto Faturamento,
+    IndicadorMetaDto Pedidos,
+    IndicadorMetaDto Pecas,
+    decimal ProjecaoFaturamento,
+    int DiasNoMes,
+    int DiasDecorridos,
+    int DiasRestantes,
+    decimal NecessarioPorDia,
+    decimal TicketMedio,
+    ResumoMesDto MesAnterior,
+    IReadOnlyList<PontoGrafico> FaturamentoPorDia,
+    IReadOnlyList<MaisVendidoDto> MaisVendidos,
+    SalvarMetaDto Sugestao,        // media dos 3 meses anteriores + 10% (para "usar sugestao")
+    bool PodeEditar);
+
+public record ResumoMesDto(int Ano, int Mes, string NomeMes, bool Definida, decimal MetaFaturamento,
+    decimal Faturamento, int Pedidos, int Pecas, int Percentual);
+
+public record MaisVendidoDto(string Produto, int Pecas, decimal Valor);
+
+public record SalvarMetaDto(
+    [Range(0.01, 99999999, ErrorMessage = "Informe a meta de faturamento.")] decimal Faturamento,
+    [Range(1, 100000, ErrorMessage = "Informe a meta de pedidos.")] int Pedidos,
+    [Range(1, 1000000, ErrorMessage = "Informe a meta de peças.")] int Pecas);
+
 public record ReposicaoDto(
     int IdProduto,
     string Produto,
@@ -187,3 +220,6 @@ public class EstoqueBaixoDto
 
     public int Estoque { get; set; }
 }
+
+/// <summary>Novo status do pedido: "Em separação", "Finalizado" ou "Cancelado".</summary>
+public record AlterarStatusDto([Required] string Status);

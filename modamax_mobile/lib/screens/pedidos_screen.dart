@@ -98,6 +98,7 @@ class PedidoDetalheScreen extends StatefulWidget {
 class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
   bool _cancelando = false;
   bool _pagando = false;
+  bool _mudandoStatus = false;
 
   /// Busca o "PIX copia e cola" do pedido na API e oferece copiar para enviar ao cliente.
   Future<void> _mostrarPix() async {
@@ -179,6 +180,52 @@ class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
     }
   }
 
+  /// Muda o status do pedido (ex.: "Em separação" -> "Finalizado" quando a mercadoria sai).
+  Future<void> _alterarStatus(String novo) async {
+    final pedido = widget.pedido;
+    if (novo == 'Cancelado') return _cancelar();
+    if (novo == 'Finalizado' && pedido.pagamentoPendente) {
+      final seguir = await confirmar(
+        context,
+        titulo: 'Pagamento pendente',
+        mensagem: 'O pagamento deste pedido ainda não foi confirmado. Finalizar mesmo assim?',
+        acao: 'Finalizar',
+        cancelar: 'Voltar',
+        destrutivo: false,
+      );
+      if (!seguir) return;
+    }
+
+    setState(() => _mudandoStatus = true);
+    try {
+      await ApiService.instancia.alterarStatusPedido(pedido.idPedido, novo);
+      if (!mounted) return;
+      mostrarMensagem(context, novo == 'Finalizado' ? 'Pedido finalizado.' : 'Pedido voltou para em separação.');
+      Navigator.of(context).pop(true);
+    } on ApiException catch (e) {
+      if (mounted) mostrarMensagem(context, e.mensagem);
+    } finally {
+      if (mounted) setState(() => _mudandoStatus = false);
+    }
+  }
+
+  /// Toque na linha do status: menu com os outros status possiveis.
+  Future<void> _escolherStatus() async {
+    final atual = widget.pedido.status;
+    final novo = await escolherAcao<String>(
+      context,
+      titulo: 'Mudar status',
+      mensagem: 'Status atual: $atual',
+      opcoes: [
+        if (atual != 'Finalizado') const OpcaoAcao('Finalizado', 'Marcar como finalizado', Icons.check_circle_outline),
+        if (atual != 'Em separação') const OpcaoAcao('Em separação', 'Voltar para em separação', Icons.inventory_2_outlined),
+        if (ApiService.instancia.podeGerenciarEstoque)
+          const OpcaoAcao('Cancelado', 'Cancelar pedido', Icons.cancel_outlined, destrutiva: true),
+      ],
+    );
+    if (novo != null && mounted) await _alterarStatus(novo);
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.pedido;
@@ -196,10 +243,14 @@ class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
               titulo: p.cliente ?? '-',
               subtitulo: 'Cliente',
             ),
+            // Tocar no status abre o menu para muda-lo (pedido cancelado nao muda mais).
             ItemLista(
               inicio: StatusPedido(status: p.status),
               titulo: p.status,
               subtitulo: '${formatarData(p.dataPedido)} · ${p.tiposVenda}',
+              valor: p.status == 'Cancelado' ? null : 'Mudar',
+              seta: p.status != 'Cancelado',
+              aoTocar: p.status == 'Cancelado' || _mudandoStatus ? null : _escolherStatus,
             ),
           ]),
           SecaoLista(cabecalho: 'Itens', children: [
@@ -241,6 +292,24 @@ class _PedidoDetalheScreenState extends State<PedidoDetalheScreen> {
                   ),
                 ],
               ),
+            ),
+          if (p.status == 'Em separação')
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: p.pagamentoPendente
+                  ? Botao.secundario(
+                      'Marcar como finalizado',
+                      iconeMaterial: Icons.local_shipping_outlined,
+                      iconeIOS: CupertinoIcons.cube_box,
+                      aoTocar: _mudandoStatus ? null : () => _alterarStatus('Finalizado'),
+                    )
+                  : Botao.principal(
+                      'Marcar como finalizado',
+                      iconeMaterial: Icons.local_shipping_outlined,
+                      iconeIOS: CupertinoIcons.cube_box,
+                      carregando: _mudandoStatus,
+                      aoTocar: () => _alterarStatus('Finalizado'),
+                    ),
             ),
           // Cancelar e permitido so aos niveis Estrategico e Tatico (mesma regra da API).
           if (p.status != 'Cancelado' && ApiService.instancia.podeGerenciarEstoque) ...[

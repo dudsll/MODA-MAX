@@ -283,6 +283,167 @@ class MetaAtual {
       );
 }
 
+/// Resumo de um mes (historico de metas e comparacao com o mes anterior).
+class ResumoMes {
+  final int ano;
+  final int mes;
+  final String nomeMes;
+  final bool definida;
+  final double metaFaturamento;
+  final double faturamento;
+  final int pedidos;
+  final int pecas;
+  final int percentual;
+
+  ResumoMes({
+    required this.ano,
+    required this.mes,
+    required this.nomeMes,
+    required this.definida,
+    required this.metaFaturamento,
+    required this.faturamento,
+    required this.pedidos,
+    required this.pecas,
+    required this.percentual,
+  });
+
+  double get ticketMedio => pedidos == 0 ? 0 : faturamento / pedidos;
+
+  /// Percentual para exibir, arredondado para baixo (99,6% nao vira "100%").
+  int get percentualExibido =>
+      metaFaturamento <= 0 ? percentual : (faturamento * 100 / metaFaturamento + 1e-9).floor();
+
+  factory ResumoMes.fromJson(Map<String, dynamic> json) => ResumoMes(
+        ano: json['ano'] as int,
+        mes: json['mes'] as int,
+        nomeMes: json['nomeMes'] as String,
+        definida: json['definida'] as bool,
+        metaFaturamento: _decimal(json['metaFaturamento']),
+        faturamento: _decimal(json['faturamento']),
+        pedidos: json['pedidos'] as int,
+        pecas: json['pecas'] as int,
+        percentual: json['percentual'] as int,
+      );
+}
+
+class MaisVendidoMes {
+  final String produto;
+  final int pecas;
+  final double valor;
+
+  MaisVendidoMes(this.produto, this.pecas, this.valor);
+
+  factory MaisVendidoMes.fromJson(Map<String, dynamic> json) =>
+      MaisVendidoMes(json['produto'] as String, json['pecas'] as int, _decimal(json['valor']));
+}
+
+/// Valores de meta de um mes (para editar ou sugerir).
+class ValoresMeta {
+  final double faturamento;
+  final int pedidos;
+  final int pecas;
+
+  ValoresMeta({required this.faturamento, required this.pedidos, required this.pecas});
+
+  factory ValoresMeta.fromJson(Map<String, dynamic> json) => ValoresMeta(
+        faturamento: _decimal(json['faturamento']),
+        pedidos: json['pedidos'] as int,
+        pecas: json['pecas'] as int,
+      );
+
+  Map<String, dynamic> toJson() => {'faturamento': faturamento, 'pedidos': pedidos, 'pecas': pecas};
+}
+
+/// Metas e resultados de um mes qualquer (GET /api/metas?ano=&mes=).
+class MetaMes {
+  final int ano;
+  final int mes;
+  final String nomeMes;
+
+  /// "atual", "encerrado" ou "futuro".
+  final String situacao;
+  final bool definida;
+  final IndicadorMeta faturamento;
+  final IndicadorMeta pedidos;
+  final IndicadorMeta pecas;
+  final double projecaoFaturamento;
+  final int diasNoMes;
+  final int diasDecorridos;
+  final int diasRestantes;
+  final double necessarioPorDia;
+  final double ticketMedio;
+  final ResumoMes mesAnterior;
+  final List<PontoGrafico> faturamentoPorDia;
+  final List<MaisVendidoMes> maisVendidos;
+  final ValoresMeta sugestao;
+  final bool podeEditar;
+
+  MetaMes({
+    required this.ano,
+    required this.mes,
+    required this.nomeMes,
+    required this.situacao,
+    required this.definida,
+    required this.faturamento,
+    required this.pedidos,
+    required this.pecas,
+    required this.projecaoFaturamento,
+    required this.diasNoMes,
+    required this.diasDecorridos,
+    required this.diasRestantes,
+    required this.necessarioPorDia,
+    required this.ticketMedio,
+    required this.mesAnterior,
+    required this.faturamentoPorDia,
+    required this.maisVendidos,
+    required this.sugestao,
+    required this.podeEditar,
+  });
+
+  bool get atual => situacao == 'atual';
+  bool get encerrado => situacao == 'encerrado';
+  bool get futuro => situacao == 'futuro';
+
+  ValoresMeta get valores =>
+      ValoresMeta(faturamento: faturamento.meta, pedidos: pedidos.meta.round(), pecas: pecas.meta.round());
+
+  /// Mesmo formato do cartao do painel, para reaproveitar os aneis.
+  MetaAtual get comoMetaAtual => MetaAtual(
+        mes: nomeMes,
+        definida: definida,
+        faturamento: faturamento,
+        pedidos: pedidos,
+        pecas: pecas,
+        projecaoFaturamento: projecaoFaturamento,
+        diasRestantes: diasRestantes,
+      );
+
+  factory MetaMes.fromJson(Map<String, dynamic> json) => MetaMes(
+        ano: json['ano'] as int,
+        mes: json['mes'] as int,
+        nomeMes: json['nomeMes'] as String,
+        situacao: json['situacao'] as String,
+        definida: json['definida'] as bool,
+        faturamento: IndicadorMeta.fromJson(json['faturamento'] as Map<String, dynamic>),
+        pedidos: IndicadorMeta.fromJson(json['pedidos'] as Map<String, dynamic>),
+        pecas: IndicadorMeta.fromJson(json['pecas'] as Map<String, dynamic>),
+        projecaoFaturamento: _decimal(json['projecaoFaturamento']),
+        diasNoMes: json['diasNoMes'] as int,
+        diasDecorridos: json['diasDecorridos'] as int,
+        diasRestantes: json['diasRestantes'] as int,
+        necessarioPorDia: _decimal(json['necessarioPorDia']),
+        ticketMedio: _decimal(json['ticketMedio']),
+        mesAnterior: ResumoMes.fromJson(json['mesAnterior'] as Map<String, dynamic>),
+        faturamentoPorDia: (json['faturamentoPorDia'] as List)
+            .map((p) => PontoGrafico.fromJson(p as Map<String, dynamic>))
+            .toList(),
+        maisVendidos:
+            (json['maisVendidos'] as List).map((p) => MaisVendidoMes.fromJson(p as Map<String, dynamic>)).toList(),
+        sugestao: ValoresMeta.fromJson(json['sugestao'] as Map<String, dynamic>),
+        podeEditar: json['podeEditar'] as bool,
+      );
+}
+
 /// Produto da central de reposicao (GET /api/reposicao).
 class ItemReposicao {
   final int idProduto;

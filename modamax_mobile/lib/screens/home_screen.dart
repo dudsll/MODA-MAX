@@ -9,6 +9,7 @@ import '../widgets/comum.dart';
 import '../widgets/graficos.dart';
 import 'clientes_screen.dart';
 import 'login_screen.dart';
+import 'metas_screen.dart';
 import 'pedidos_screen.dart';
 import 'produtos_screen.dart';
 
@@ -183,6 +184,12 @@ class _PainelTabState extends State<_PainelTab> {
     }
   }
 
+  Future<void> _abrirMetas() async {
+    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MetasScreen()));
+    if (!mounted) return;
+    setState(() => _meta = ApiService.instancia.metaAtual());   // a meta pode ter sido editada
+  }
+
   @override
   Widget build(BuildContext context) {
     final usuario = ApiService.instancia.usuario;
@@ -212,19 +219,36 @@ class _PainelTabState extends State<_PainelTab> {
               builder: (context, snapshot) {
                 if (!snapshot.hasData) return const SizedBox.shrink();
                 final meta = snapshot.data!.valor;
-                return _Cartao(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Metas · ${meta.mes}', style: estiloSubtitulo(context)),
-                      const SizedBox(height: 12),
-                      AneisMeta(meta: meta),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Projeção do mês: ${formatarMoeda(meta.projecaoFaturamento)} · ${meta.diasRestantes} dias restantes',
-                        style: estiloLegenda(context),
+                // Toque no cartao abre a tela de metas (outros meses, detalhes e edicao).
+                return Semantics(
+                  button: true,
+                  hint: 'Abre os detalhes das metas',
+                  child: GestureDetector(
+                    key: const Key('cartao-metas'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _abrirMetas,
+                    child: Cartao(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(child: Text('Metas · ${meta.mes}', style: estiloSubtitulo(context))),
+                              Text('Detalhes', style: estiloLegenda(context).copyWith(color: corDestaque(context))),
+                              Icon(icone(context, material: Icons.chevron_right, ios: CupertinoIcons.chevron_right),
+                                  size: 18, color: corDestaque(context)),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          AneisMeta(meta: meta),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Projeção do mês: ${formatarMoeda(meta.projecaoFaturamento)} · ${meta.diasRestantes} dias restantes',
+                            style: estiloLegenda(context),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 );
               },
@@ -281,8 +305,8 @@ class _PainelTabState extends State<_PainelTab> {
                 final g = snapshot.data!.valor;
                 return Column(
                   children: [
-                    _Cartao(child: GraficoBarras(titulo: 'Faturamento por mês', pontos: g.vendasPorMes, formatar: formatarMoeda)),
-                    _Cartao(
+                    Cartao(child: GraficoBarras(titulo: 'Faturamento por mês', pontos: g.vendasPorMes, formatar: formatarMoeda)),
+                    Cartao(
                       child: GraficoBarras(
                         titulo: 'Mais vendidos',
                         pontos: g.produtosMaisVendidos,
@@ -297,30 +321,6 @@ class _PainelTabState extends State<_PainelTab> {
           ],
         );
       },
-    );
-  }
-}
-
-/// Cartao branco arredondado com a mesma margem das secoes de lista.
-class _Cartao extends StatelessWidget {
-  final Widget child;
-
-  const _Cartao({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final ios = ehIOS(context);
-    return Container(
-      margin: EdgeInsets.fromLTRB(ios ? 20 : 16, 8, ios ? 20 : 16, 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        // No Android, cartao "preenchido" do Material 3: um tom acima do fundo da tela.
-        color: ios
-            ? CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
-            : Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(ios ? 10 : 12),
-      ),
-      child: child,
     );
   }
 }

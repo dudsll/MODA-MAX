@@ -262,3 +262,27 @@ class ArrastarParaApagar extends StatelessWidget {
 
 /// Como uma tela de edicao terminou: salvou as alteracoes ou apagou o registro.
 enum ResultadoEdicao { salvo, apagado }
+
+/// Cartao branco arredondado com a mesma margem das secoes de lista.
+class Cartao extends StatelessWidget {
+  final Widget child;
+
+  const Cartao({super.key, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final ios = ehIOS(context);
+    return Container(
+      margin: EdgeInsets.fromLTRB(ios ? 20 : 16, 8, ios ? 20 : 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        // No Android, cartao "preenchido" do Material 3: um tom acima do fundo da tela.
+        color: ios
+            ? CupertinoColors.secondarySystemGroupedBackground.resolveFrom(context)
+            : Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(ios ? 10 : 12),
+      ),
+      child: child,
+    );
+  }
+}
