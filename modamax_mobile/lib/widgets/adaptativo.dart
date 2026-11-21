@@ -392,6 +392,9 @@ class CampoTexto extends StatelessWidget {
   final String? Function(String texto)? validar;
   final ValueChanged<String>? aoConfirmar;
 
+  /// Largura do rotulo a esquerda no iPhone (rotulos longos, como "Faturamento", precisam de mais).
+  final double larguraRotulo;
+
   const CampoTexto({
     super.key,
     required this.controle,
@@ -406,6 +409,7 @@ class CampoTexto extends StatelessWidget {
     this.preenchimento,
     this.validar,
     this.aoConfirmar,
+    this.larguraRotulo = 96,
   });
 
   @override
@@ -415,7 +419,7 @@ class CampoTexto extends StatelessWidget {
         initialValue: controle.text,
         validator: validar == null ? null : (_) => validar!(controle.text),
         builder: (estado) => CupertinoFormRow(
-          prefix: SizedBox(width: 96, child: Text(rotulo)),
+          prefix: SizedBox(width: larguraRotulo, child: Text(rotulo)),
           error: estado.hasError ? Text(estado.errorText!) : null,
           child: CupertinoTextField.borderless(
             controller: controle,

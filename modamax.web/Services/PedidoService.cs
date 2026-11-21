@@ -113,6 +113,31 @@ public class PedidoService
         });
     }
 
+    /// <summary>
+    /// Muda o status do pedido (ex.: "Em separação" para "Finalizado" quando a mercadoria sai).
+    /// Cancelar devolve o estoque, pela mesma regra de <see cref="CancelarAsync"/>; pedido
+    /// cancelado não volta, porque o estoque já foi devolvido e os itens podem ter sido vendidos.
+    /// </summary>
+    public async Task<ResultadoPedido> AlterarStatusAsync(int idPedido, string novoStatus)
+    {
+        if (!StatusValidos.Contains(novoStatus)) return Falha("Status de pedido invalido.");
+        if (novoStatus == StatusCancelado) return await CancelarAsync(idPedido);
+
+        return await EmTransacaoAsync(async () =>
+        {
+            var pedido = await CarregarAsync(idPedido);
+            if (pedido == null) return NaoEncontrado();
+            if (pedido.Status == StatusCancelado) return Falha("Pedido cancelado nao pode mudar de status.");
+            if (pedido.Status == novoStatus) return Falha($"O pedido ja esta com o status \"{novoStatus}\".");
+
+            var anterior = pedido.Status;
+            pedido.Status = novoStatus;
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Pedido {IdPedido}: status {Anterior} -> {Novo}", pedido.IdPedido, anterior, novoStatus);
+            return new ResultadoPedido { Pedido = pedido };
+        });
+    }
+
     public Task<ResultadoPedido> CancelarAsync(int idPedido)
     {
         return EmTransacaoAsync(async () =>

@@ -113,6 +113,12 @@ void main() {
     await t.tocar(find.text('Confirmar pagamento'));
     await t.esperar(find.text('Pagamento confirmado.'));
 
+    // ---- Status: o pedido pago sai de "Em separacao" para "Finalizado"
+    await t.tocar(find.text('Bianca Arantes Araujo').first);
+    await t.esperar(find.text('Marcar como finalizado'));
+    await t.tocar(find.text('Marcar como finalizado'));
+    await t.esperar(find.text('Pedido finalizado.'));
+
     // ---- Pedido no cartao em 3x: registrar e cancelar
     await t.novoPedido(cliente: 'Dhebora Barreto', produto: 'Blusa Jeans', parcelas3x: true);
     await t.tocar(find.text('Dhebora Barreto').first);

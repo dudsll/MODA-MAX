@@ -109,6 +109,70 @@ public class ApiTests : IClassFixture<ModaMaxFactory>
         Assert.Empty(produtos!); // "%" nao vira curinga que traz tudo
     }
 
+    private static async Task<int> CriarPedidoAsync(HttpClient cliente)
+    {
+        var produtos = await cliente.GetFromJsonAsync<JsonElement[]>("/api/produtos?somenteDisponiveis=true", Json);
+        var clientes = await cliente.GetFromJsonAsync<JsonElement[]>("/api/clientes", Json);
+        var resposta = await cliente.PostAsJsonAsync("/api/pedidos", new
+        {
+            idCliente = clientes![0].GetProperty("idCliente").GetInt32(),
+            tiposVenda = "Varejo",
+            itens = new[] { new { idProduto = produtos![0].GetProperty("idProduto").GetInt32(), quantidade = 1, desconto = 0 } }
+        });
+        resposta.EnsureSuccessStatusCode();
+        return (await resposta.Content.ReadFromJsonAsync<JsonElement>(Json)).GetProperty("idPedido").GetInt32();
+    }
+
+    private static async Task<string> StatusDoPedidoAsync(HttpClient cliente, int id) =>
+        (await cliente.GetFromJsonAsync<JsonElement>($"/api/pedidos/{id}", Json)).GetProperty("status").GetString()!;
+
+    [Fact]
+    public async Task Vendas_finaliza_o_pedido_e_pode_voltar_para_em_separacao()
+    {
+        var cliente = await ClienteLogadoAsync("operacional@modamax.com");
+        var id = await CriarPedidoAsync(cliente);
+        Assert.Equal("Em separação", await StatusDoPedidoAsync(cliente, id));
+
+        var resposta = await cliente.PutAsJsonAsync($"/api/pedidos/{id}/status", new { status = "Finalizado" });
+        Assert.Equal(HttpStatusCode.NoContent, resposta.StatusCode);
+        Assert.Equal("Finalizado", await StatusDoPedidoAsync(cliente, id));
+
+        resposta = await cliente.PutAsJsonAsync($"/api/pedidos/{id}/status", new { status = "Em separação" });
+        Assert.Equal(HttpStatusCode.NoContent, resposta.StatusCode);
+        Assert.Equal("Em separação", await StatusDoPedidoAsync(cliente, id));
+    }
+
+    [Fact]
+    public async Task Status_invalido_ou_repetido_retorna_400()
+    {
+        var cliente = await ClienteLogadoAsync("operacional@modamax.com");
+        var id = await CriarPedidoAsync(cliente);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await cliente.PutAsJsonAsync($"/api/pedidos/{id}/status", new { status = "Enviado" })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await cliente.PutAsJsonAsync($"/api/pedidos/{id}/status", new { status = "Em separação" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await cliente.PutAsJsonAsync("/api/pedidos/999999/status", new { status = "Finalizado" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Cancelar_pelo_status_exige_gerencia_e_pedido_cancelado_nao_volta()
+    {
+        var vendas = await ClienteLogadoAsync("operacional@modamax.com");
+        var id = await CriarPedidoAsync(vendas);
+        Assert.Equal(HttpStatusCode.Forbidden,
+            (await vendas.PutAsJsonAsync($"/api/pedidos/{id}/status", new { status = "Cancelado" })).StatusCode);
+
+        var gerencia = await ClienteLogadoAsync("tatico@modamax.com");
+        Assert.Equal(HttpStatusCode.NoContent,
+            (await gerencia.PutAsJsonAsync($"/api/pedidos/{id}/status", new { status = "Cancelado" })).StatusCode);
+        Assert.Equal("Cancelado", await StatusDoPedidoAsync(gerencia, id));
+
+        var resposta = await gerencia.PutAsJsonAsync($"/api/pedidos/{id}/status", new { status = "Finalizado" });
+        Assert.Equal(HttpStatusCode.BadRequest, resposta.StatusCode);
+        Assert.Contains("cancelado", (await resposta.Content.ReadAsStringAsync()).ToLowerInvariant());
+    }
+
     [Fact]
     public async Task Criar_pedido_pela_api_baixa_o_estoque()
     {
@@ -323,6 +387,56 @@ public class ApiTests : IClassFixture<ModaMaxFactory>
         var produtos = await cliente.GetFromJsonAsync<JsonElement[]>("/api/produtos", Json);
         Assert.Equal(produtos!.Length, reposicao!.Length);
         Assert.Contains(reposicao, r => r.GetProperty("situacao").GetString() == "Critico");
+    }
+
+    [Fact]
+    public async Task Metas_de_qualquer_mes_trazem_detalhes_e_historico()
+    {
+        var cliente = await ClienteLogadoAsync("tatico@modamax.com");
+        var hoje = DateTime.Today;
+
+        var atual = await cliente.GetFromJsonAsync<JsonElement>("/api/metas", Json);
+        Assert.Equal("atual", atual.GetProperty("situacao").GetString());
+        Assert.Equal(DateTime.DaysInMonth(hoje.Year, hoje.Month), atual.GetProperty("faturamentoPorDia").GetArrayLength());
+        Assert.False(atual.GetProperty("podeEditar").GetBoolean());   // gerencia so consulta
+        Assert.True(atual.TryGetProperty("mesAnterior", out _));
+
+        var passado = hoje.AddMonths(-2);
+        var encerrado = await cliente.GetFromJsonAsync<JsonElement>($"/api/metas?ano={passado.Year}&mes={passado.Month}", Json);
+        Assert.Equal("encerrado", encerrado.GetProperty("situacao").GetString());
+        Assert.Equal(0, encerrado.GetProperty("diasRestantes").GetInt32());
+
+        var historico = await cliente.GetFromJsonAsync<JsonElement[]>("/api/metas/historico?meses=12", Json);
+        Assert.Equal(12, historico!.Length);
+        Assert.Equal(hoje.AddMonths(-1).Month, historico[^1].GetProperty("mes").GetInt32());
+
+        Assert.Equal(HttpStatusCode.BadRequest, (await cliente.GetAsync("/api/metas?ano=2026&mes=13")).StatusCode);
+    }
+
+    [Fact]
+    public async Task So_a_diretoria_edita_metas_e_mes_encerrado_nao_muda()
+    {
+        var hoje = DateTime.Today;
+        var proximo = hoje.AddMonths(1);
+        var meta = new { faturamento = 98765.43m, pedidos = 321, pecas = 654 };
+
+        var gerente = await ClienteLogadoAsync("tatico@modamax.com");
+        Assert.Equal(HttpStatusCode.Forbidden, (await gerente.PutAsJsonAsync($"/api/metas/{proximo.Year}/{proximo.Month}", meta)).StatusCode);
+
+        var diretor = await ClienteLogadoAsync("estrategico@modamax.com");
+        Assert.Equal(HttpStatusCode.NoContent, (await diretor.PutAsJsonAsync($"/api/metas/{proximo.Year}/{proximo.Month}", meta)).StatusCode);
+
+        var salvo = await diretor.GetFromJsonAsync<JsonElement>($"/api/metas?ano={proximo.Year}&mes={proximo.Month}", Json);
+        Assert.Equal("futuro", salvo.GetProperty("situacao").GetString());
+        Assert.True(salvo.GetProperty("definida").GetBoolean());
+        Assert.True(salvo.GetProperty("podeEditar").GetBoolean());
+        Assert.Equal(98765.43m, salvo.GetProperty("faturamento").GetProperty("meta").GetDecimal());
+        Assert.Equal(321, salvo.GetProperty("pedidos").GetProperty("meta").GetDecimal());
+
+        var passado = hoje.AddMonths(-1);
+        Assert.Equal(HttpStatusCode.BadRequest, (await diretor.PutAsJsonAsync($"/api/metas/{passado.Year}/{passado.Month}", meta)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest,
+            (await diretor.PutAsJsonAsync($"/api/metas/{proximo.Year}/{proximo.Month}", new { faturamento = 0, pedidos = 0, pecas = 0 })).StatusCode);
     }
 
     [Fact]

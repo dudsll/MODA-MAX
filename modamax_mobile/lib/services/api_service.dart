@@ -129,6 +129,10 @@ class ApiService {
 
   Future<void> confirmarPagamento(int id) => _enviar('PUT', '/api/pedidos/$id/pagamento');
 
+  /// Muda o status do pedido ("Em separação", "Finalizado" ou "Cancelado").
+  Future<void> alterarStatusPedido(int id, String status) =>
+      _enviar('PUT', '/api/pedidos/$id/status', corpo: {'status': status});
+
   /// "PIX copia e cola" do pedido para enviar ao cliente.
   Future<String> pixDoPedido(int id) async =>
       ((await _enviar('GET', '/api/pedidos/$id/pix')) as Map<String, dynamic>)['copiaECola'] as String;
@@ -137,6 +141,22 @@ class ApiService {
         '/api/metas/atual',
         (json) => MetaAtual.fromJson(json as Map<String, dynamic>),
       );
+
+  /// Metas e resultados de qualquer mes (tela de metas).
+  Future<Dados<MetaMes>> metaDoMes(int ano, int mes) => _lerComCache(
+        '/api/metas?ano=$ano&mes=$mes',
+        (json) => MetaMes.fromJson(json as Map<String, dynamic>),
+      );
+
+  /// Ultimos meses encerrados, do mais antigo ao mais recente.
+  Future<Dados<List<ResumoMes>>> historicoMetas({int meses = 12}) => _lerComCache(
+        '/api/metas/historico?meses=$meses',
+        (json) => (json as List).map((r) => ResumoMes.fromJson(r as Map<String, dynamic>)).toList(),
+      );
+
+  /// Define a meta do mes (so a diretoria; meses encerrados nao mudam).
+  Future<void> salvarMeta(int ano, int mes, ValoresMeta valores) =>
+      _enviar('PUT', '/api/metas/$ano/$mes', corpo: valores.toJson());
 
   Future<Dados<List<ItemReposicao>>> reposicao() => _lerComCache(
         '/api/reposicao',

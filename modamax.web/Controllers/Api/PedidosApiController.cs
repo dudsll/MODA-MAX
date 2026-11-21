@@ -91,6 +91,27 @@ public class PedidosApiController : ControllerBase
         return NoContent();
     }
 
+    // PUT /api/pedidos/5/status  { "status": "Finalizado" }
+    // Qualquer nivel muda entre "Em separação" e "Finalizado" (como na edicao do pedido na Web);
+    // cancelar continua restrito aos niveis Estrategico e Tatico.
+    [HttpPut("{id:int}/status")]
+    public async Task<IActionResult> AlterarStatus(int id, AlterarStatusDto dto)
+    {
+        if (dto.Status == PedidoService.StatusCancelado && !User.IsInRole("Estrategico") && !User.IsInRole("Tatico"))
+        {
+            return Problem(detail: "Seu nivel de acesso nao permite cancelar pedidos.", statusCode: StatusCodes.Status403Forbidden);
+        }
+
+        var resultado = await _pedidoService.AlterarStatusAsync(id, dto.Status);
+        if (!resultado.Sucesso)
+        {
+            return Problem(detail: resultado.Erro,
+                statusCode: resultado.NaoEncontrado ? StatusCodes.Status404NotFound : StatusCodes.Status400BadRequest);
+        }
+
+        return NoContent();
+    }
+
     // PUT /api/pedidos/5/pagamento  (confirma o recebimento)
     [HttpPut("{id:int}/pagamento")]
     public async Task<IActionResult> ConfirmarPagamento(int id)
