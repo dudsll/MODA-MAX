@@ -20,7 +20,9 @@ set -e
 ORIGEM="${0:A:h}"
 DESTINO="$HOME/Developer/ModaMax-android"
 IP="${1:-$(ipconfig getifaddr en0)}"
-[[ -z "$IP" ]] && { echo "Nao encontrei o IP do Mac na rede. Informe: ./preparar_android.sh 192.168.0.10"; exit 1; }
+[[ -z "$IP" && -z "$API_URL" ]] && { echo "Nao encontrei o IP do Mac na rede. Informe: ./preparar_android.sh 192.168.0.10"; exit 1; }
+# API publicada (ex.: Azure): API_URL=https://modamax.azurewebsites.net ./preparar_android.sh
+API="${API_URL:-http://$IP:5248}"
 
 # Java e SDK instalados pelo Homebrew (openjdk@21 e android-commandlinetools).
 export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home}"
@@ -31,15 +33,15 @@ mkdir -p "$DESTINO"
 rsync -a --delete --exclude build --exclude .dart_tool --exclude ios/Pods --exclude android/.gradle "$ORIGEM/" "$DESTINO/"
 cd "$DESTINO"
 flutter pub get
-flutter build apk --release --dart-define=API_URL="http://$IP:5248"
+flutter build apk --release --dart-define=API_URL="$API"
 APK="$DESTINO/build/app/outputs/flutter-apk/app-release.apk"
 cp "$APK" "$HOME/Desktop/ModaMax.apk"
 
 CELULAR=$("$ADB" devices 2>/dev/null | awk 'NR > 1 && $2 == "device" { print $1; exit }')
 if [[ -z "$CELULAR" ]]; then
-  echo "APK gerado: $HOME/Desktop/ModaMax.apk (API: http://$IP:5248)"
+  echo "APK gerado: $HOME/Desktop/ModaMax.apk (API: $API)"
   echo "Nenhum Android conectado. Ligue o cabo com a depuracao USB ativa, ou instale o APK a mao."
   exit 0
 fi
 "$ADB" -s "$CELULAR" install -r "$APK" >/dev/null
-echo "App instalado no Android ($CELULAR). API: http://$IP:5248"
+echo "App instalado no Android ($CELULAR). API: $API"

@@ -19,7 +19,9 @@ set -e
 ORIGEM="${0:A:h}"
 DESTINO="$HOME/Developer/ModaMax-mobile"
 IP="${1:-$(ipconfig getifaddr en0)}"
-[[ -z "$IP" ]] && { echo "Nao encontrei o IP do Mac no Wi-Fi. Informe: ./preparar_iphone.sh 192.168.0.10"; exit 1; }
+[[ -z "$IP" && -z "$API_URL" ]] && { echo "Nao encontrei o IP do Mac na rede. Informe: ./preparar_iphone.sh 192.168.0.10"; exit 1; }
+# API publicada (ex.: Azure): API_URL=https://modamax.azurewebsites.net ./preparar_iphone.sh
+API="${API_URL:-http://$IP:5248}"
 TEAM="${TEAM:-$(defaults read com.apple.dt.Xcode IDEProvisioningTeamByIdentifier 2>/dev/null | awk -F'= ' '/teamID/ { gsub(/[; "]/, "", $2); print $2; exit }')}"
 
 mkdir -p "$DESTINO"
@@ -28,7 +30,7 @@ cd "$DESTINO"
 flutter pub get
 
 if [[ -z "$TEAM" ]]; then
-  flutter build ios --config-only --debug --no-codesign --dart-define=API_URL="http://$IP:5248"
+  flutter build ios --config-only --debug --no-codesign --dart-define=API_URL="$API"
   echo "Nenhuma conta Apple no Xcode. Adicione em Xcode > Settings > Accounts e rode de novo."
   open ios/Runner.xcworkspace
   exit 0
@@ -37,7 +39,7 @@ fi
 # Team so na copia: o repositorio continua sem o identificador pessoal de ninguem.
 sed -i '' "s/^\(\t*\)PRODUCT_BUNDLE_IDENTIFIER = br.com.modamax.modamaxMobile;/\1DEVELOPMENT_TEAM = $TEAM;\n\1PRODUCT_BUNDLE_IDENTIFIER = br.com.modamax.modamaxMobile;/" ios/Runner.xcodeproj/project.pbxproj
 
-flutter build ios --config-only --release --dart-define=API_URL="http://$IP:5248"
+flutter build ios --config-only --release --dart-define=API_URL="$API"
 xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner -configuration Release \
   -destination 'generic/platform=iOS' -derivedDataPath build/xcode \
   -allowProvisioningUpdates -allowProvisioningDeviceRegistration -quiet build
@@ -49,4 +51,4 @@ if [[ -z "$IPHONE" ]]; then
   exit 0
 fi
 xcrun devicectl device install app --device "$IPHONE" "$APP" >/dev/null
-echo "App instalado no iPhone ($IPHONE). API: http://$IP:5248"
+echo "App instalado no iPhone ($IPHONE). API: $API"
